@@ -25,24 +25,24 @@ dtsDict = {
         
     'wider':    
         dtParams('pascal_voc', 1,
-                 {'data_path': 'D:/zym/data/wider_part',
+                 {'data_path': 'D:/work/data/wider_part',
                   'image_set': 'img'
                  }),
     'wider_fcn':    
         dtParams('fcn_gt', 1,
-                 {'data_path': 'D:/zym/data/wider_part/JPEGImages',
-                  'gt_lst': 'D:/zym/data/wider_part/fcn_gt.lst',
+                 {'data_path': 'D:/work/data/wider_part/JPEGImages',
+                  'gt_lst': 'D:/work/data/wider_part/fcn_gt.lst',
                  }),
     'wider_fddb':    
         dtParams('fddb_gt', 1,
-                 {'data_path': 'D:/zym/data/wider_part/JPEGImages',
-                  'gt_lst': 'D:/zym/data/wider_part/fddb_gt.lst',
+                 {'data_path': 'D:/work/data/wider_part/JPEGImages',
+                  'gt_lst': 'D:/work/data/wider_part/fddb_gt.lst',
                  }),
     'wider_fddb2':    
         dtParams('fddb_gt', 1,
-                 {'data_path': 'D:/zym/data/wider_part/JPEGImages',
-                  'gt_lst': 'D:/zym/data/wider_part/fddb_gt.lst',
-                  'image_set': 'D:/zym/data/wider_part/fddb_img.txt',
+                 {'data_path': 'D:/work/data/wider_part/JPEGImages',
+                  'gt_lst': 'D:/work/data/wider_part/fddb_gt.lst',
+                  'image_set': 'D:/work/data/wider_part/fddb_img.txt',
                  }),
     
     'imdb':

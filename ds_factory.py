@@ -30,8 +30,6 @@ class pascal_voc(imdb):
 #        self._image_set = image_set
         
         self._image_index = self._load_image_set_index()
-#        self._widths = np.zeros((self.num_images), dtype=np.int16)
-#        self._heights = np.zeros((self.num_images), dtype=np.int16)
         
 #        self.cls = 'face'      ??????
         self.data_format = 'LTRB'
@@ -133,6 +131,7 @@ class fcn_gt(imdb):
                 img_index.append(im)
                 gt_roidb.append({'boxes': gt[:,1:],
                                  'cls':   cls,
+                                 'diff':  np.zeros(len(cls))
                                 })
         return img_index, gt_roidb
     
@@ -171,12 +170,14 @@ class fcn_lmk(imdb):
                 gt_lmk = np.array(gt_lmk, dtype=float).reshape((-1,self.anno_len * 2))
                 
                 idx_bg = self.anno_len-5
-                gt = gt_lmk[:, idx_bg*2:]                
+                gt = gt_lmk[:, idx_bg*2:]
                 gt = gt[:, [0,1,2,5]]
                 
                 im, _ = osp.splitext(im)
                 img_index.append(im)
                 gt_roidb.append({'boxes': gt,
+                                 'cls':   self.labels * gt.shape[0],
+                                 'diff':  np.zeros(gt.shape[0])
                                 })
         return img_index, gt_roidb
         
@@ -228,6 +229,7 @@ class fddb_gt(imdb):
             img_index.append(im)
             gt_roidb.append({'boxes': gt[:,:4],
                              'cls':   cls,
+                             'diff':  np.zeros(len(cls))
                             })
         
         return img_index, gt_roidb

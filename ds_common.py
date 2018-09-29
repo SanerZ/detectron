@@ -77,7 +77,7 @@ class imdb(object):
     @property
     def gt_roidb(self):
         if self._gt_roidb is None:
-            self._gt_roidb = self.get_gt_roidb()
+            self._gt_roidb = self._get_gt_roidb()
         return self._gt_roidb
         
     
@@ -172,11 +172,11 @@ class imdb(object):
             return np.zeros((nObj, 5))
         
         if self.data_format == 'LTRB':
-            bb[:,2:]-=bb[:,:2]-1
+            bb[:,2:] -= bb[:,:2] - 1
             
         cls = self.gt_roidb[i]['cls']
-        diff = np.array(self.gt_roidb[i]['diff']) \
-            if not use_diff and 'diff' in self.gt_roidb[i].keys() else np.zeros(nObj)
+        diff = np.array(self.gt_roidb[i]['diff']) if not use_diff \
+            else np.zeros(nObj)
         
         bbv = self.gt_roidb[i]['bbv'] if 'bbv' in self.gt_roidb[i].keys() else np.zeros((nObj, 4))
         
@@ -193,7 +193,10 @@ class imdb(object):
     
     
     def gt_filter(self, **filter_params):
-        """ update filter params and filter gt_roidb"""
+        """ 
+         update filter params and filter gt_roidb
+         OUT_GT:  list of gts format as LTWH
+        """
         self.filter_params.update(**filter_params)
         self.gt_box_filter = list()
         
@@ -267,15 +270,13 @@ class imdb(object):
             return 
         
         if self.data_format == 'LTWH':
-            boxes[:,2:]+=boxes[:,:2]-1
+            boxes[:,2:] += boxes[:,:2] - 1
         
         cls = self.gt_roidb[i]['cls']
         diff = self.gt_roidb[i]['diff']
 
-        pth = osp.dirname(f_xml)
-        if not osp.exists(pth):
-            os.makedirs(pth)
-            
+        Path(f_xml).parent.mkdir(parents=True,exist_ok=True)
+        
         doc = Document()
         anno = doc.createElement('annotation')
         doc.appendChild(anno)
@@ -349,13 +350,9 @@ class imdb(object):
             line = [self.image_index[i]+self._image_ext]
             gt = self.gt_roidb[i]['boxes'].copy()
             if self.data_format == 'LTRB':
-                gt[:,2:]-=gt[:,:2]-1
-#            diff = np.reshape(self.gt_roidb[i]['diff'], (-1,1))
+                gt[:,2:] -= gt[:,:2] - 1
             classes = self.gt_roidb[i]['cls']
-            try:
-                cls = [self.labels.index[c] for c in classes]
-            except:
-                cls = np.zeros(len(classes)).astype(int)
+            cls = [self.labels.index[c] for c in classes]
             boxes = np.array(gt[:,:4], dtype = str)
             gt_line = np.column_stack((cls, boxes))
             line.extend(gt_line.reshape(-1))
@@ -363,27 +360,26 @@ class imdb(object):
         fid.close() 
             
     
-    def write_lst_with_lmk(self, fname, diff=True, anno_len=77):
+    def write_lst_with_lmk(self, fname, use_diff=True, anno_len=77):
         fid = open(fname, 'w')
         for i in range(self.num_images):
             line = [self.image_index[i]+self._image_ext]
+            gt = self.gt_roidb[i]['boxes'].copy()
             
-            nObj = len(self.gt_roidb[i]['boxes'])
-            fdiff = np.array(self.gt_roidb[i]['diff'], dtype = bool) \
-                if not diff and 'diff' in self.gt_roidb[i].keys() else np.zeros(nObj, dtype=bool)
-            gt = self.gt_roidb[i]['boxes'][~fdiff].copy()
+            no_diff = ~np.array(self.gt_roidb[i]['diff'], dtype = bool)
+            gt = gt if use_diff else gt[no_diff]
             if self.data_format == 'LTWH':
-                gt[:,2:]+=gt[:,:2]-1
+                gt[:,2:] += gt[:,:2] - 1
             for g in gt:
                 lbl=anno_len*2*['-1']
                 idx_bg = anno_len-5
                 
-                lbl[idx_bg*2]=lbl[idx_bg*2+6]=str(g[0])
-                lbl[idx_bg*2+1]=lbl[idx_bg*2+3]=str(g[1])
-                lbl[idx_bg*2+2]=lbl[idx_bg*2+4]=str(g[2])
-                lbl[idx_bg*2+5]=lbl[idx_bg*2+7]=str(g[3])
-                lbl[idx_bg*2+8]=str(0.5*(g[0]+g[2]))
-                lbl[idx_bg*2+9]=str(0.5*(g[1]+g[3]))
+                lbl[idx_bg*2] = lbl[idx_bg*2+6] = str(g[0])
+                lbl[idx_bg*2+1] = lbl[idx_bg*2+3] = str(g[1])
+                lbl[idx_bg*2+2] = lbl[idx_bg*2+4] = str(g[2])
+                lbl[idx_bg*2+5] = lbl[idx_bg*2+7] = str(g[3])
+                lbl[idx_bg*2+8] = str(0.5*(g[0]+g[2]))
+                lbl[idx_bg*2+9] = str(0.5*(g[1]+g[3]))
                 line.extend(lbl)
             fid.write(' '.join(line)+'\n')
         fid.close()
