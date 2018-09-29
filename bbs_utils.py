@@ -9,6 +9,8 @@ Created on Mon Aug 20 17:55:18 2018
 import numpy as np
 import cv2
 
+
+# new nms
 def nms(det, ov_threshold=0.3, topN=750, thrN=0, merge=True):
     order = det[:, 4].ravel().argsort()[::-1]
     det = det[order, :]
@@ -61,53 +63,7 @@ def score_decay(info, thrN=np.inf, eta=1.):
     
     return score
 
-def boxConvert(box, direct=True):  # 1: wh -> xy   0: xy -> wh
-    target_box = box.copy()
-    if direct:
-        target_box[:, 2:4] += target_box[:, :2] - 1
-    else:
-        target_box[:, 2:4] -= target_box[:, :2] - 1
-    
-    return target_box
-
-
-def bbResize(bb, hr=1, wr=0, ar=0):
-    # if bb is list of all images' boxes 
-    if isinstance(bb, list):
-        nImg = len(bb)
-        bb_o = [0]*nImg
-        for i in range(nImg):
-            bb_o[i] = bbResize(bb[i], hr, wr, ar)
-        return bb_o
-    
-    assert bb.shape[1]>=4
-    assert ar>0 or (hr>0 and wr>0)
-    # preserve area and center, set aspect ratio
-    if hr==0 and wr==0:
-        area = np.sqrt(bb[:,2]*bb[:,3])
-        ar = np.sqrt(ar)
-        d = area*ar - bb[:,2]
-        bb[:,0] -= d/2.; bb[:,2] += d
-        d = area/ar - bb[:,3]
-        bb[:,1] -= d/2.; bb[:,3] += d
-        return bb   
-    # possibly adjust h/w based on hr/wr
-    if hr!=0:
-        d = (hr - 1)*bb[:,3]
-        bb[:,1] -= d/2.; bb[:,3] += d
-    if wr!=0:
-        d = (wr - 1)*bb[:,2]
-        bb[:,0] -= d/2.; bb[:,2] += d
-    # possibly adjust h/w based on ar and NEW h/w
-    if hr!=0:
-        d = bb[:,2]/ar - bb[:,3]
-        bb[:,1] -= d/2.; bb[:,3] += d
-    if wr!=0:
-        d = bb[:,3]*ar - bb[:,2]
-        bb[:,0] -= d/2.; bb[:,2] += d
-    
-    return bb
-    
+# IOU
 def calc_overlaps(bs1, bs2, transform=False):
     ovs = []
     b1 = bs1.copy()
@@ -138,17 +94,97 @@ def bbox_overlap(bs, b):
     
     o = inter / uni
     
-    return o   
+    return o
 
 
-def overlay_bounding_boxes(raw_img, refined_bboxes, lw=2, actFun=None, transform=False):
+""" Transformation Functions """
+
+def boxFormatTransform(box, wh=True):
+    target_box = box.copy()
+    if wh:
+        target_box[:, 2:4] += target_box[:, :2] - 1
+    else:
+        target_box[:, 2:4] -= target_box[:, :2] - 1
+    
+    return target_box
+
+def boxResize(bb, hr=1, wr=0, ar=0):
+    """
+    Convert from matlab tools   bbResize
+        bb: format as LTWH
+    """
+    # if bb is list of all images' boxes 
+    if isinstance(bb, list):
+        nImg = len(bb)
+        bb_o = [0]*nImg
+        for i in range(nImg):
+            bb_o[i] = boxResize(bb[i], hr, wr, ar)
+        return bb_o
+    
+    assert bb.shape[1]>=4
+    assert ar>0 or (hr>0 and wr>0)
+    # preserve area and center, set aspect ratio
+    if hr==0 and wr==0:
+        area = np.sqrt(bb[:,2]*bb[:,3])
+        ar = np.sqrt(ar)
+        d = area*ar - bb[:,2]
+        bb[:,0] -= d/2.; bb[:,2] += d
+        d = area/ar - bb[:,3]
+        bb[:,1] -= d/2.; bb[:,3] += d
+        return bb   
+    # possibly adjust h/w based on hr/wr
+    if hr!=0:
+        d = (hr - 1)*bb[:,3]
+        bb[:,1] -= d/2.; bb[:,3] += d
+    if wr!=0:
+        d = (wr - 1)*bb[:,2]
+        bb[:,0] -= d/2.; bb[:,2] += d
+    # possibly adjust h/w based on ar and NEW h/w
+    if hr!=0:
+        d = bb[:,2]/ar - bb[:,3]
+        bb[:,1] -= d/2.; bb[:,3] += d
+    if wr!=0:
+        d = bb[:,3]*ar - bb[:,2]
+        bb[:,0] -= d/2.; bb[:,2] += d
+    
+    return bb
+
+
+""" Visualization Functions """
+
+def output_bounding_boxes(raw_img, outpath, gt=[], det=[], thr=0., only_wrong=False):
+    def preprocess(box_in):
+        box = np.array(box_in).reshape((-1,6)) if box_in == [] \
+            else box_in[box_in[:,-1]!=-1]
+        if box.shape[1] < 6:
+            box = np.column_stack((box, 1))
+        return box
+            
+    g = preprocess(gt)
+    dt = preprocess(det)
+    dt = dt[dt[:,4]>=thr]
+    
+    if only_wrong and np.all(g[:,-1]) == 1 and np.all(dt[:,-1]) == 1:
+        return 
+    
+    overlay_bounding_boxes(raw_img, g, color=[255,0,0], wh=True)
+    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==1], wh=True)
+    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], color=[0,255,0], wh=True)
+    
+    img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(outpath, img)
+
+def identity(x):
+    return x
+
+def overlay_bounding_boxes(raw_img, refined_bboxes, lw=2, color=None, actFun=identity, wh=False):
     """
     Overlay bounding boxes of face on images.
     Args:
       raw_img:
         A target image.
       refined_bboxes:
-        Bounding boxes of detected faces.
+        Bounding boxes of detected faces. format as LTRB
       lw: 
         Line width of bounding boxes. If zero specified,
         this is determined based on confidence of each detection.
@@ -157,17 +193,15 @@ def overlay_bounding_boxes(raw_img, refined_bboxes, lw=2, actFun=None, transform
     """
 
     # Overlay bounding boxes on an image with the color based on the confidence.
-    for rb in refined_bboxes:
-        r = rb.copy()
-        if transform:
-            r[2:4]+=r[:2]
-        try:
-            _score = actFun(r[4]) if actFun else r[4]
-            _score = min(1., _score)
-        except:
-            _score = 1.
-        cm_idx = int(np.ceil(_score * 255))
-        rect_color = [int(np.ceil(x * 255)) for x in cm_data[cm_idx]]  # parula
+    rbs = boxFormatTransform(refined_bboxes, wh) if wh else refined_bboxes
+    for r in rbs:
+        if color:
+            rect_color = color
+        else:   
+            _score = min(actFun(r[4]), 1.) if r.shape[0]>=5 else 1.
+            cm_idx = int(np.ceil(_score * 255))
+            rect_color = [int(np.ceil(x * 255)) for x in cm_data[cm_idx]]  # parula
+        
         _lw = lw
         if lw == 0:  # line width of each bounding box is adaptively determined.
             bw, bh = r[2] - r[0] + 1, r[3] - r[0] + 1

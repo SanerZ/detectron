@@ -138,7 +138,7 @@ def compRoc(gt, det, use_11_points=False, ref_score=None):
     return rec, prec, ap, recpi, ref_thr
 
 """ Helper Functioins """
-	
+
 def ref_threshold(ids, score, fp, nImg, ref=0.1**np.arange(4,0,-1)):
     # compute number of error images
     fp_im = [fp[i] and im_id not in ids[:i][fp[:i]] for i,im_id in enumerate(ids)]

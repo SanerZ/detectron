@@ -14,7 +14,7 @@ from pathlib2 import Path
 import os
 from xml.dom.minidom import Document
 
-from .bbs_utils import overlay_bounding_boxes, boxConvert
+from .bbs_utils import overlay_bounding_boxes, boxFormatTransform
 
 class imdb(object):
     """Image database."""

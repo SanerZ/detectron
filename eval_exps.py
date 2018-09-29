@@ -23,7 +23,7 @@ from .ds_config import dtsDict
 from .ds_factory import ds_factory
 
 from .eval_utils import evalRes, compRoc, ref_threshold
-from .bbs_utils import boxResize
+from .bbs_utils import boxResize, output_bounding_boxes
 
 from .loggers import lcfg, pl, ps
 
@@ -165,6 +165,7 @@ def plotExps(cfg, res, plotName, ref_score=None):
     %  plotName - filename for saving plots
     """
     # Compute (xs, ys) for every exp/alg
+    print('\nPlotting: %s' % plotName)
     roc = defaultdict(list)
     ref = 0.1**np.arange(4,0,-1) 
     for (e, a), (g, d) in res.items():
@@ -173,6 +174,11 @@ def plotExps(cfg, res, plotName, ref_score=None):
             ref_thr = ref_score[a]
         except:
             ref_thr = None
+        
+        print('\tExp %d/%d, Alg %d/%d,: %s/%s' % \
+             (cfg.expsDict.keys().index(e), len(cfg.expsDict), \
+              cfg.algNames.index(a), len(cfg.algNames), e, a))
+        
         r = list(compRoc(g, d, ref_score=ref_thr))
         if cfg.plotAlg:
             roc[a].append([e]+r)    # [[expNm, rec, prec, ap, recpi, ref_thr],[]...]
@@ -180,7 +186,7 @@ def plotExps(cfg, res, plotName, ref_score=None):
             roc[e].append([a]+r)    # [[algNm, rec, prec, ap, recpi, ref_thr],[]...]
     
         
-    
+    print('\n')
     # Generate plots
     for k, v in roc.items():
         colors = [np.maximum(np.mod(np.array([78,121,42])*(i+1),255)/255.,.3) \
@@ -223,6 +229,24 @@ def plotExps(cfg, res, plotName, ref_score=None):
         plt.savefig(saveName)
         plt.show()
 
+def drawBoxes(cfg, dtNm, res):
+    # Draw box for each picture and save
+    print('\nDrawing bounding boxes and detected boxes')
+    gt = ds_factory(dtNm)
+    for (e, a), (g, d) in res.items():
+        if not cfg.expsDict[e].visible:
+            continue
+        
+        g, d = list(g), list(d)
+        nImg = len(g)
+        assert len(d)==nImg
+        
+        for idx in range(nImg):
+            raw_img = plt.imread(gt.image_path_at(idx))
+            imgpath = cfg.wrongDir/dtNm/a/e/('%05d.jpg' % idx)
+            imgpath.parent.mkdir(parents=True, exist_ok=True)
+            output_bounding_boxes(raw_img, imgpath.as_posix(), \
+                                  g[idx], d[idx], cfg.thr, cfg.only_wrong)
 
 def main(cfg):
     ref_score = compRef(cfg)
@@ -235,8 +259,9 @@ def main(cfg):
         gts, gt_sides = loadGts(cfg, pltName)
         res = evalAlgs(cfg, pltName, gts, dts, gt_sides)
         # plot curves and bbs
-        print('\n\n')
         plotExps(cfg, res, plotName, ref_score)
+        if cfg.visible:
+            drawBoxes(cfg, dtNm, res)
         
 
         
