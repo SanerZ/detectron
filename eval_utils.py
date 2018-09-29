@@ -117,14 +117,10 @@ def compRoc(gt, det, use_11_points=False, ref_score=None):
     ap = voc_ap(rec, prec, use_11_points)
     
     if det.shape[1]<7:
-        return rec, prec, ap, []
+        return rec, prec, ap
     
     # compute number of error images
     ids, score = det_valid[:,-1], det_valid[:,4]
-#    fp_im = [fp0[i] and im_id not in ids[:i][fp0[:i]] for i,im_id in enumerate(ids)]
-#    fp_im = np.cumsum(fp_im).astype(float)
-#    err = fp_im/nImg
-#    ref = 0.1**np.arange(4,0,-1)
     
     if ref_score is None:
         ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg)
@@ -138,19 +134,11 @@ def compRoc(gt, det, use_11_points=False, ref_score=None):
                 recpi[i] = 0
             else:
                 recpi[i] = np.max(rec[score >= thr])
-    
-
-#    ref_thr = np.zeros(len(ref))
-#    for idx, rf in enumerate(ref):
-#        if np.sum(err <= rf) == 0:
-#            recpi[idx] = 0
-#            ref_thr[idx] = -np.inf
-#        else:
-#            recpi[idx] = np.max(rec[err <= rf])  
-#            ref_thr[idx] = det_valid[np.argmax(rec[err <= rf]), 4]
-   
+       
     return rec, prec, ap, recpi, ref_thr
 
+""" Helper Functioins """
+	
 def ref_threshold(ids, score, fp, nImg, ref=0.1**np.arange(4,0,-1)):
     # compute number of error images
     fp_im = [fp[i] and im_id not in ids[:i][fp[:i]] for i,im_id in enumerate(ids)]

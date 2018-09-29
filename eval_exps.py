@@ -23,10 +23,35 @@ from .ds_config import dtsDict
 from .ds_factory import ds_factory
 
 from .eval_utils import evalRes, compRoc, ref_threshold
-from .bbs_utils import bbResize
+from .bbs_utils import boxResize
 
 from .loggers import lcfg, pl, ps
 
+def compRef(cfg):
+    bgName = cfg.resDir/cfg.bgName
+    dts = loadDts(cfg, bgName.as_posix())
+    ref = dict()
+    if len(dts) == 0:
+        return ref
+    
+    lcfg({'logfile': (bgName/'Ref').as_posix()})
+    print('\nExp reference threshold:')
+    print('\n{0:<28}\t{1[0]:<8g}\t{1[1]:<8g}\t{1[2]:<8g}\t{1[3]:<8g}'.\
+                  format('', 0.1**np.arange(4,0,-1)))
+    for algNm in cfg.algNames:
+        det = [np.column_stack((d, [i]*len(d))) for i,d in enumerate(dts[algNm])]
+        nImg = len(det)
+        det = np.concatenate(det, 0)
+        det = det[np.any(det[:,:4], axis=1)]
+        det = det[np.argsort(-det[:,4])]
+        ids, score = det[:,-1], det[:, 4]
+        fp = np.ones(len(ids)).astype(bool)
+        ref_thr, ref_idx = ref_threshold(ids, score, fp, nImg)
+        ref[algNm] = ref_thr
+        pl.info('{0:^28}\t{1[0]:<8.3}\t{1[1]:<8.3}\t{1[2]:<8.3}\t{1[3]:<8.3}'.
+               format(algNm, ref_thr))
+    print('\n\n')
+    return ref
 
 def loadDts(cfg, pltName):
     print('\nLoading detections: %s' % pltName)
@@ -40,12 +65,12 @@ def loadDts(cfg, pltName):
         
         if not osp.exists(aNm+'.txt'):
             continue
-        # load from txt file
+        # load from txt file format as LTWH
         print('\tAlgorithm #%d: %s' % (d, a))
         dt0 = np.loadtxt(aNm+'.txt').reshape((-1,6))
         ids = dt0[:,0].astype(int)
         dt = [dt0[ids==i,1:] for i in range(max(ids)+1)]
-        dt = bbResize(dt, 1, 0, cfg.aspectRatio)
+        dt = boxResize(dt, 1, 0, cfg.aspectRatio)
         dts[a].extend(dt)
         np.save(aNm+'.npy', dt)
     
@@ -64,7 +89,7 @@ def filterGtFun(bb, bbv, hr, vr, ar, bnds, aspectRatio):
 
 
 # get gt_roidb according to dtName   
-       
+# return gts format as LTWH       
 def loadGts(cfg, pltName):
     print('\nLoading ground truth: %s' % pltName)
     Path(pltName).mkdir(parents=True, exist_ok=True)
@@ -72,7 +97,7 @@ def loadGts(cfg, pltName):
     gts = defaultdict(list)
     dtNm = osp.basename(pltName)
     gt0 = ds_factory(dtNm)
-#    gt0.write_lst_with_gt('gt.lst')
+
     rz = cfg.resize if dtsDict[dtNm].resize else 1
     for g, e in enumerate(cfg.expsDict):
         gNm = osp.join(pltName, 'gt-'+e) + '.npy'
@@ -84,9 +109,9 @@ def loadGts(cfg, pltName):
         exp = cfg.expsDict[e]
         filterGt = partial(filterGtFun, hr=exp.hr, vr=exp.vr, ar=exp.ar, \
                            bnds=cfg.bnds, aspectRatio=cfg.aspectRatio)
-#        gt = [gt0.img_gt_filter(i, cfg.labels, filterGt)[0] for i in range(gt0.num_images)]
+
         gt = gt0.gt_filter(labels=cfg.labels, filterGt=filterGt)
-        gt = bbResize(gt, rz, 0, cfg.aspectRatio)
+        gt = boxResize(gt, rz, 0, cfg.aspectRatio)
         gts[e].extend(gt)
         np.save(gNm, gt)
       
@@ -195,43 +220,16 @@ def plotExps(cfg, res, plotName, ref_score=None):
             plt.ylabel('Precision')
         plt.title(osp.basename(saveName))
         
-        
-#        plotFile.close()
         plt.savefig(saveName)
         plt.show()
-           
-def compRef(cfg):
-    dts = loadDts(cfg, cfg.bgName)
-    ref = dict()
-    if len(dts) == 0:
-        return ref
-    
-    lcfg({'logfile': osp.join(cfg.bgName, 'Ref')})
-    print('\nExp reference threshold:')
-    print('\n{0:<28}\t{1[0]:<8g}\t{1[1]:<8g}\t{1[2]:<8g}\t{1[3]:<8g}'.\
-                  format('', 0.1**np.arange(4,0,-1)))
-    for algNm in cfg.algNames:
-        det = [np.column_stack((d, [i]*len(d))) for i,d in enumerate(dts[algNm])]
-        nImg = len(det)
-        det = np.concatenate(det, 0)
-        det = det[np.any(det[:,:4], axis=1)]
-        det = det[np.argsort(-det[:,4])]
-        ids, score = det[:,-1], det[:, 4]
-        fp = np.ones(len(ids)).astype(bool)
-        ref_thr, ref_idx = ref_threshold(ids, score, fp, nImg)
-        ref[algNm] = ref_thr
-        pl.info('{0:^28}\t{1[0]:<8.3}\t{1[1]:<8.3}\t{1[2]:<8.3}\t{1[3]:<8.3}'.
-               format(algNm, ref_thr))
-    print('\n\n')
-    return ref
-        
+
 
 def main(cfg):
     ref_score = compRef(cfg)
         
     for dtNm in cfg.dtNames: 
-        pltName = osp.join(cfg.resDir, dtNm).replace('\\','/')
-        plotName = osp.join(cfg.resDir, 'results', dtNm).replace('\\','/')
+        pltName = (cfg.resDir/dtNm).as_posix()
+        plotName = (cfg.resDir/'results'/dtNm).as_posix()
         # load detections and ground truth and evaluate
         dts = loadDts(cfg, pltName) #, algNms 
         gts, gt_sides = loadGts(cfg, pltName)
