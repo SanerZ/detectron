@@ -64,13 +64,14 @@ def score_decay(info, thrN=np.inf, eta=1.):
     return score
 
 # IOU
-def calc_overlaps(bs1, bs2, transform=False):
+def calc_overlaps(bs1, bs2, wh=False):
     ovs = []
     b1 = bs1.copy()
     b2 = bs2.copy()
-    if transform:
-        b1[:,2:4] += b1[:,:2] - 1
-        b2[:,2:4] += b2[:,:2] - 1
+    
+    if wh:
+        b1 = boxFormatTransform(b1, wh)
+        b2 = boxFormatTransform(b2, wh)
         
     for b in b1:
         ov = bbox_overlap(b2, b)

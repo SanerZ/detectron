@@ -107,30 +107,29 @@ class imdb(object):
         return osp.join(self._data_path, self.image_index[i]+self._image_ext)
         
     def check_and_modify_bbox(self, box, i):
-        x1 = np.minimum(np.maximum(0, box[:,:1]), self.widths[i]-2)
-        y1 = np.minimum(np.maximum(0, box[:,1:2]), self.heights[i]-2)
+        x1 = np.minimum(np.maximum(0, box[:,[0]]), self.widths[i]-2)
+        y1 = np.minimum(np.maximum(0, box[:,[1]]), self.heights[i]-2)
 
         if self.data_format == 'LTWH':
-            x2 = np.minimum(self.widths[i]-1, x1+np.maximum(1,box[:,2:3]))
-            y2 = np.minimum(self.heights[i]-1, y1+np.maximum(1,box[:,3:4]))
+            x2 = np.minimum(self.widths[i]-1, x1+np.maximum(1,box[:,[2]]))
+            y2 = np.minimum(self.heights[i]-1, y1+np.maximum(1,box[:,[3]]))
             w = x2 - x1
             h = y2 - y1
             return np.hstack((x1, y1, w, h))
         else:
-            x2 = np.minimum(self.widths[i]-1, np.maximum(x1+1,box[:,2:3]))
-            y2 = np.minimum(self.heights[i]-1, np.maximum(y1+1,box[:,3:4])) 
+            x2 = np.minimum(self.widths[i]-1, np.maximum(x1+1,box[:,[2]]))
+            y2 = np.minimum(self.heights[i]-1, np.maximum(y1+1,box[:,[3]])) 
             return np.hstack((x1, y1, x2, y2))
         
         
-    def bbox_display(self, idx, lw=2):
+    def bbox_display(self, idx, lw=2, color=None):
         """display the idxTh picture with bounding box"""
         
         imgpath = self.image_path_at(idx)
         
         im = plt.imread(imgpath)
-        boxes = self.gt_roidb[idx]['boxes']
-        transform = True if self.data_format == 'LTWH' else False       
-        overlay_bounding_boxes(im, boxes, lw, transform = transform)
+        boxes = self.gt_roidb[idx]['boxes'] 
+        overlay_bounding_boxes(im, boxes, lw, color, wh = self.data_format == 'LTWH')
         
         plt.figure(figsize=[10,8])
         plt.imshow(im)
@@ -394,7 +393,7 @@ class imdb(object):
     def _write_fddb_gt(self, i, f):
         imginfo = self.image_index[i] + self._image_ext
         gt = self.gt_roidb[i]['boxes'] 
-        det = gt if self.data_format == 'LTWH' else boxConvert(gt, direct=False)
+        det = gt if self.data_format == 'LTWH' else boxFormatTransform(gt, wh=False)
         
         f.write('{:s}\n'.format(imginfo))
         f.write('{:d}\n'.format(det.shape[0]))
