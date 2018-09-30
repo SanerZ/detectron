@@ -10,28 +10,35 @@ import cv2
 
 from .bbs_utils import overlay_bounding_boxes
 
-# draw bounding box
-def output_bounding_boxes(raw_img, outpath, gt=[], det=[], thr=0., only_wrong=False):
+show_params = {
+    'thr'       : 0.,
+    'evShow'    : 1,
+    'outpath'   : None,
+}
+# Display evaluation results for given image and save
+def output_bounding_boxes(raw_img, gt=[], det=[], **params):
     def preprocess(box_in):
         box = np.array(box_in).reshape((-1,6)) if box_in == [] \
             else box_in[box_in[:,-1]!=-1]
         if box.shape[1] < 6:
             box = np.column_stack((box, 1))
         return box
-            
+    
+    show_params.update(params)
     g = preprocess(gt)
     dt = preprocess(det)
-    dt = dt[dt[:,4]>=thr]
+    dt = dt[dt[:,4]>=show_params['thr']]
     
-    if only_wrong and np.all(g[:,-1]) == 1 and np.all(dt[:,-1]) == 1:
+    if show_params['evShow'] and np.all(g[:,-1]) == 1 and np.all(dt[:,-1]) == 1:
         return 
     
     overlay_bounding_boxes(raw_img, g, color=[255,0,0], wh=True)
     overlay_bounding_boxes(raw_img, dt[dt[:,-1]==1], wh=True)
     overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], color=[0,255,0], wh=True)
     
-    img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(outpath, img)
+    if show_params['outpath']:
+        img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(show_params['outpath'], img)
     
 
 def evalRes(gt, det, ovthresh=0.5, multi_match=False):
