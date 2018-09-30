@@ -8,18 +8,19 @@ Created on Fri Jul 13 17:44:23 2018
 import os
 import os.path as osp
 import numpy as np
-
-from .ds_common import imdb
-from .ds_config import dtsDict
+from ConfigParser import ConfigParser
 
 import xml.etree.ElementTree as ET
 
+from .ds_common import imdb
+
+ds_config = ConfigParser()
 
 
 def ds_factory(ds_name):
-    ds_config = dtsDict[ds_name]
-    ds_class = eval(ds_config.ds)
-    return ds_class(ds_name, **ds_config.params) 
+    ds_params = dict(ds_config.items(ds_name))
+    ds_class = eval(ds_params.pop('handler'))
+    return ds_class(ds_name, **ds_params) 
 
 """
                 PASCAL_VOC DATASET
