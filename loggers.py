@@ -10,7 +10,9 @@ import logging.config
 from functools import partial
 from pathlib2 import Path
 
+cfgpath = Path(__file__).parent/'logging.conf'
 
-lcfg = partial(logging.config.fileConfig, str(Path(__file__).parent/"logging.conf"))
+lcfg = partial(logging.config.fileConfig, cfgpath.as_posix())
+
 pl = logging.getLogger('file_append')
 ps = logging.getLogger('file_only')
