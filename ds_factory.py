@@ -14,6 +14,8 @@ import xml.etree.ElementTree as ET
 
 from .ds_common import imdb
 
+# USAGE:
+#   ds_config.read((Path(cfg.ds_cfgDir)/'datasets.conf').as_posix())
 ds_config = ConfigParser()
 
 
