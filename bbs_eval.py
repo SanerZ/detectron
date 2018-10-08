@@ -117,7 +117,7 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
                 
     return gt_o, det_o
 
-def compRoc(gt, det, use_11_points=False, ref_score=None):
+def compRoc(gt, det, use_11_points=False, ref_score=[]):
     """
     gt: groudtruth          x, y, w, h, difficult, match
     det: detection result   x, y, w, h, confidence, match, [id]
@@ -156,7 +156,7 @@ def compRoc(gt, det, use_11_points=False, ref_score=None):
     # compute number of error images
     ids, score = det_valid[:,-1], det_valid[:,4]
     
-    if ref_score is None:
+    if ref_score == []:
         ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg)
         rec_hat = np.append(rec, 0)
         recpi = rec_hat[ref_idx]
