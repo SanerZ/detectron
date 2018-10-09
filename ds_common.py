@@ -351,7 +351,7 @@ class imdb(object):
             if self.data_format == 'LTRB':
                 gt[:,2:] -= gt[:,:2] - 1
             classes = self.gt_roidb[i]['cls']
-            cls = [self.labels.index[c] for c in classes]
+            cls = [self.labels.index(c) for c in classes]
             boxes = np.array(gt[:,:4], dtype = str)
             gt_line = np.column_stack((cls, boxes))
             line.extend(gt_line.reshape(-1))
