@@ -351,7 +351,8 @@ class imdb(object):
             if self.data_format == 'LTRB':
                 gt[:,2:] -= gt[:,:2] - 1
             classes = self.gt_roidb[i]['cls']
-            cls = [self.labels.index(c) for c in classes]
+            diff_sign = 2 * self.gt_roidb[i]['diff'] - 1
+            cls = [self.labels.index(c) for c in classes] * diff_sign
             boxes = np.array(gt[:,:4], dtype = str)
             gt_line = np.column_stack((cls, boxes))
             line.extend(gt_line.reshape(-1))
@@ -399,10 +400,11 @@ class imdb(object):
         f.write('{:d}\n'.format(det.shape[0]))
         
         classes = self.gt_roidb[i]['cls']
-        try:
-            cls = [self.labels.index[c] for c in classes]
-        except:
-            cls = np.ones(len(classes)).astype(int)
+        # try:
+        diff_sign = 2 * self.gt_roidb[i]['diff'] - 1
+        cls = [self.labels.index(c) for c in classes] * diff_sign
+        # except:
+            # cls = np.ones(len(classes)).astype(int)
 
         for i in range(det.shape[0]):
             xmin = det[i][0]
