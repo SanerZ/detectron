@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import PIL
+import cv2
 import os.path as osp
 from pathlib2 import Path
 import os
@@ -122,7 +123,7 @@ class imdb(object):
             return np.hstack((x1, y1, x2, y2))
         
         
-    def bbox_display(self, idx, lw=2, color=None, **filter_params):
+    def bbox_display(self, idx, lw=2, color=None, show=True, **filter_params):
         """display the idxTh picture with bounding box"""
         
         self.filter_params = {
@@ -140,10 +141,21 @@ class imdb(object):
         boxes = boxes[~ign]
         overlay_bounding_boxes(im, boxes, lw, color, wh=True)
         
+        if not show:
+            return im
+        
         plt.figure(figsize=[10,8])
         plt.imshow(im)
         plt.show()    
+        
 
+
+    def gt_box_save(self, outdir, **display_params):
+        for idx in range(self.num_images):
+            img = self.bbox_display(idx, show=False, **display_params)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            imgpath = Path(outdir)/('%05d.jpg' % idx)
+            cv2.imwrite(imgpath.as_posix(), img)
 
     # TODO: 
     """  Analysis """   
