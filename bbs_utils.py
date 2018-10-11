@@ -47,6 +47,18 @@ def bbox_overlap(bs, b):
 
 """ Transformation Functions """
 
+def xywh_to_xyxy(boxes, sw=True):
+    """Convert [x y w h] box format to [x1 y1 x2 y2] format."""
+    if not sw:
+        return boxes
+    return np.hstack((boxes[:, 0:2], boxes[:, 0:2] + boxes[:, 2:4] - 1, boxes[:, 4:]))
+
+def xyxy_to_xywh(boxes, sw=True):
+    """Convert [x1 y1 x2 y2] box format to [x y w h] format."""
+    if not sw:
+        return boxes
+    return np.hstack((boxes[:, 0:2], boxes[:, 2:4] - boxes[:, 0:2] + 1, boxes[:, 4:]))
+
 def boxFormatTransform(box, wh=True):
     target_box = box.copy()
     if wh:
