@@ -151,8 +151,11 @@ class imdb(object):
 
 
     def gt_box_save(self, outdir, **display_params):
+        default_params = dict(lw=3, color=[255,0,0])
+        default_params.update(**display_params)
+        
         for idx in range(self.num_images):
-            img = self.bbox_display(idx, show=False, **display_params)
+            img = self.bbox_display(idx, show=False, **default_params)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             imgpath = Path(outdir)/('%05d.jpg' % idx)
             cv2.imwrite(imgpath.as_posix(), img)
