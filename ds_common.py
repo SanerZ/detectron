@@ -27,16 +27,10 @@ class imdb(object):
         self._image_index = []
         self._image_set = image_set
         self._gt_roidb = None
+        self._gt_box_filter = None
         
         self._image_ext = '.jpg'
         
-        # self.filter_params = {
-                # 'filterGt':     self._filterGtFun,
-                # 'hr':           [0, np.inf],
-                # 'labels':       None,     # example
-                # 'use_diff':     False,
-                # 'display':      True,
-                # }
         
         
     @property
@@ -66,15 +60,19 @@ class imdb(object):
         except:
             self._heights = self._get_image_size(1)
         return self._heights
+        
+    @property
+    def gt_box_filter(self):
+        if self._gt_box_filter is None:
+            self._gt_box_filter = [xyxy_to_xywh(self.gt_roidb[i]['boxes'], self.data_format == 'LTRB')
+                                for i in range(self.num_images)]
+        return self._gt_box_filter
+            
     
     @property
     def num_objects(self):
-        try:
-            num_objs = np.sum([len(self.gt_box_filter[i]) for i in range(self.num_images)])
-        except:
-            num_objs = np.sum([len(self.gt_roidb[i]['boxes']) for i in range(self.num_images)])
-        
-        return num_objs
+        return np.sum([len(self.gt_box_filter[i]) for i in range(self.num_images)])
+
     
     @property
     def gt_roidb(self):
@@ -124,14 +122,23 @@ class imdb(object):
             return np.hstack((x1, y1, x2, y2))
         
         
-    def bbox_display(self, idx, lw=2, color=None):
+    def bbox_display(self, idx, lw=2, color=None, **filter_params):
         """display the idxTh picture with bounding box"""
+        
+        self.filter_params = {
+                'filterGt':     self._filterGtFun,
+                'labels':       None,     
+                'use_diff':     False,
+                }
+        self.filter_params.update(**filter_params)
         
         imgpath = self.image_path_at(idx)
         
         im = plt.imread(imgpath)
-        boxes = self.gt_roidb[idx]['boxes'] 
-        overlay_bounding_boxes(im, boxes, lw, color, wh = self.data_format == 'LTWH')
+        boxes = self._img_gt_filter(idx)
+        ign = boxes[:,4].astype(bool)
+        boxes = boxes[~ign]
+        overlay_bounding_boxes(im, boxes, lw, color, wh=True)
         
         plt.figure(figsize=[10,8])
         plt.imshow(im)
@@ -162,22 +169,17 @@ class imdb(object):
         """
         p = edict(self.filter_params)
         filter_keys = ['cls', 'bb', 'bbv', ]
-        # use_diff = self.filter_params['use_diff']
-        # filterGt = self.filter_params['filterGt']
-        # labels = self.filter_params['labels']
         
         height = float(self.heights[i])
         gt = edict(self.gt_roidb[i])
         gt.update(bb=xyxy_to_xywh(gt.boxes, self.data_format == 'LTRB'))
-        # width = float(self.widths[i])
 
         # keep or not according to labels
         keep = np.where([p.labels is None or c in p.labels for c in gt.cls])[0]
         nObj = len(keep)
         if nObj == 0:
             return np.zeros((nObj, 5))
-            
-            
+                        
         # ignore or not according to params
         valid_keys = list(set(filter_keys) & set(gt.keys()))
         filterGt = partial(p.filterGt, gt_side=height)
@@ -190,35 +192,10 @@ class imdb(object):
         ign = np.array(ign, dtype=bool)
 
         if not p.use_diff:
-            ign = gt.diff[keep] | ign
+            ign = (ign | gt.diff[keep]).astype(bool)
         
         return np.column_stack((gt['bb'][keep], ign))
         
-        # bb = self.gt_roidb[i]['boxes'].copy()
-        # nObj = len(bb)
-        # if nObj == 0:
-            # return np.zeros((nObj, 5))
-        
-        # if self.data_format == 'LTRB':
-            # bb[:,2:] -= bb[:,:2] - 1
-            
-        # cls = self.gt_roidb[i]['cls']
-        # diff = np.array(self.gt_roidb[i]['diff']) if not use_diff \
-            # else np.zeros(nObj)
-        
-        # bbv = self.gt_roidb[i]['bbv'] if 'bbv' in self.gt_roidb[i].keys() else np.zeros((nObj, 4))
-        
-        # keep = np.where([labels is None or cls[idx] in labels for idx in range(nObj)])[0]
-        # if filterGt is False:
-            # ign = diff[keep]
-        # else:
-            # imgsize = np.tile((width, height), 2)
-            # ign = np.array([not filterGt(bb[idx]/imgsize, bbv[idx]/imgsize) for idx in keep]).astype(bool)
-
-        # self.gt_box_filter.append(bb[keep][~ign])
-        
-        # return np.column_stack((bb[keep], ign))
-    
     
     def gt_filter(self, **filter_params):
         """ 
@@ -232,9 +209,15 @@ class imdb(object):
                 }
                 
         self.filter_params.update(**filter_params)
-        self.gt_box_filter = list()
+        gt_box_filter = [self._img_gt_filter(i) for i in range(self.num_images)]
         
-        return [self._img_gt_filter(i) for i in range(self.num_images)]
+        def bb_filter(boxes):
+            ign = boxes[:,4].astype(bool)
+            return boxes[~ign, :4]
+        
+        self._gt_box_filter = map(bb_filter, gt_box_filter)
+        
+        return gt_box_filter
     
     def _draw_dist(self, data):
         """Draw distribution figure of data array"""
@@ -244,7 +227,6 @@ class imdb(object):
         fig = plt.figure()            
         plt.bar(xlim, ylim, linewidth=0.2)
         
-        # if self.filter_params['display']:
         plt.show()
         
         return fig, [xlim, ylim]
