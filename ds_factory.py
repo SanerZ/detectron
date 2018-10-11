@@ -232,7 +232,6 @@ class fddb_gt(imdb):
                 gt = np.column_stack((gt, np.ones(ngt)))
             cls = [self.labels[int(g[-1])] for g in gt]
             diff = (gt[:,-1]<0).astype(int)
-            print(diff)
             img_index.append(im)
             gt_roidb.append({'boxes': gt[:,:4],
                              'cls':   cls,
