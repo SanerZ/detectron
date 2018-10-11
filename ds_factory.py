@@ -108,6 +108,7 @@ class fcn_gt(imdb):
         
         self.data_format = 'LTWH'
         self.labels = [
+                'background',
                 'face',
                 ]
         
@@ -127,14 +128,15 @@ class fcn_gt(imdb):
                 im, gt = ls[0], ls[1:]
                 assert len(gt)%5 == 0, \
                     'length of ground truth shoude be times of 5, \
-                     format as cls, x, y, w, h'
+                     format as cls/ign, x, y, w, h'
                 gt = np.array(gt, dtype=float).reshape((-1,5))
-                cls = [self.labels[int(g[0])] for g in gt]
+                cls = [self.labels[abs(int(g[0]))] for g in gt]
+                diff = (gt[:,0]<0).astype(int)
                 im, _ = osp.splitext(im)
                 img_index.append(im)
                 gt_roidb.append({'boxes': gt[:,1:],
                                  'cls':   cls,
-                                 'diff':  np.zeros(len(cls))
+                                 'diff':  diff #np.zeros(len(cls))
                                 })
         return img_index, gt_roidb
     
@@ -229,10 +231,12 @@ class fddb_gt(imdb):
             if gt.shape[1] == 4:
                 gt = np.column_stack((gt, np.ones(ngt)))
             cls = [self.labels[int(g[-1])] for g in gt]
+            diff = (gt[:,-1]<0).astype(int)
+            print(diff)
             img_index.append(im)
             gt_roidb.append({'boxes': gt[:,:4],
                              'cls':   cls,
-                             'diff':  np.zeros(len(cls))
+                             'diff':  diff #np.zeros(len(cls))
                             })
         
         return img_index, gt_roidb
