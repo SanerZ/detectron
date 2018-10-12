@@ -153,6 +153,7 @@ class imdb(object):
     def gt_box_save(self, outdir, **display_params):
         default_params = dict(lw=3, color=[255,0,0])
         default_params.update(**display_params)
+        Path(outdir).mkdir(parents=True, exist_ok=True)
         
         for idx in range(self.num_images):
             img = self.bbox_display(idx, show=False, **default_params)
