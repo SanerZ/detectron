@@ -265,11 +265,13 @@ class imdb(object):
             box = self.gt_box_filter[i]
             if box.shape[0] == 0:
                 continue
-
-            gt_scale.extend(box[:,3])    
+            
+            scale = box[:,3].astype(int)
             if not pix:
-                gt_scale[-1] = gt_scale[-1]*1000.0/self.heights[i]
-                
+                scale = scale * 1000.0 /self.heights[i]
+            
+            gt_scale.extend(scale)    
+       
         scale, hist = self._draw_dist(gt_scale)
 
 
@@ -383,7 +385,7 @@ class imdb(object):
             if self.data_format == 'LTRB':
                 gt[:,2:] -= gt[:,:2] - 1
             classes = self.gt_roidb[i]['cls']
-            diff_sign = 2 * self.gt_roidb[i]['diff'] - 1
+            diff_sign = 1 - 2 * self.gt_roidb[i]['diff']
             cls = [self.labels.index(c) for c in classes] * diff_sign
             boxes = np.array(gt[:,:4], dtype = str)
             gt_line = np.column_stack((cls, boxes))
@@ -433,7 +435,7 @@ class imdb(object):
         
         classes = self.gt_roidb[i]['cls']
         # try:
-        diff_sign = 2 * self.gt_roidb[i]['diff'] - 1
+        diff_sign = 1 - 2 * self.gt_roidb[i]['diff']
         cls = [self.labels.index(c) for c in classes] * diff_sign
         # except:
             # cls = np.ones(len(classes)).astype(int)

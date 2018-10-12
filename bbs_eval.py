@@ -10,11 +10,6 @@ import cv2
 
 from .bbs_utils import overlay_bounding_boxes
 
-show_params = {
-    'thr'       : 0.,
-    'evShow'    : 1,
-    'outpath'   : None,
-}
 # Display evaluation results for given image and save
 def output_bounding_boxes(raw_img, gt=[], det=[], **params):
     def preprocess(box_in):
@@ -24,7 +19,9 @@ def output_bounding_boxes(raw_img, gt=[], det=[], **params):
             box = np.column_stack((box, 1))
         return box
     
+    show_params = dict(thr=0, evShow=1, outpath=None)
     show_params.update(params)
+    
     g = preprocess(gt)
     dt = preprocess(det)
     dt = dt[dt[:,4]>=show_params['thr']]
