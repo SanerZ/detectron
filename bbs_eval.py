@@ -31,7 +31,8 @@ def output_bounding_boxes(raw_img, gt=[], det=[], **params):
     
     overlay_bounding_boxes(raw_img, g, color=[255,0,0], wh=True)
     overlay_bounding_boxes(raw_img, dt[dt[:,-1]==1], wh=True)
-    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], color=[0,255,0], wh=True)
+    # overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], color=[0,255,0], wh=True)
+    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], wh=True)
     
     if show_params['outpath']:
         img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
@@ -107,7 +108,7 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
             else:
                 # match success
                 gt_match[jmax] = 1
-                dt_match[d] = 1
+                dt_match[d] = ovmax
     
     gt_o = np.hstack((gt, gt_match))
     det_o = np.hstack((det, dt_match))
@@ -117,7 +118,7 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
 def compRoc(gt, det, use_11_points=False, ref_score=[]):
     """
     gt: groudtruth          x, y, w, h, difficult, match
-    det: detection result   x, y, w, h, confidence, match, [id]
+    det: detection result   x, y, w, h, confidence, match(ovlap), [id]
     ref: false percentage to display recall list   
              default        [0.0001, 0.001 , 0.01  , 0.1]
     """
@@ -134,7 +135,8 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
     det_valid = det[det[:,5]!=-1]
     det_valid = det_valid[np.argsort(-det_valid[:,4])]  # sort by scores
     
-    tp = det_valid[:,5]
+    iou = det_valid[:,5]
+    tp = (iou>0).astype(float)
     fp = 1. - tp
     fp0 = fp.astype(bool)
     
@@ -147,8 +149,13 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
     prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
     ap = voc_ap(rec, prec, use_11_points)
     
+    iou_rec = np.cumsum(iou)
+    iou_rec = iou_rec / tp
+    # iou[iou==0]=1.1
+    # print iou_rec
+    
     if det.shape[1]<7:
-        return rec, prec, ap
+        return rec, prec, ap, iou_rec
     
     # compute number of error images
     ids, score = det_valid[:,-1], det_valid[:,4]
@@ -157,6 +164,10 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
         ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg)
         rec_hat = np.append(rec, 0)
         recpi = rec_hat[ref_idx]
+        iou_hat = np.append(iou_rec, 0)
+        # iou_metric = rec_hat[ref_idx]
+        iou_metric = iou_rec[ref_idx]
+        # iou_metric_min = [min(iou[:idx+1]) for idx in ref_idx] 
     else:
         ref_thr = ref_score
         recpi = np.zeros(len(ref_thr))
@@ -166,7 +177,7 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
             else:
                 recpi[i] = np.max(rec[score >= thr])
        
-    return rec, prec, ap, recpi, ref_thr
+    return rec, prec, ap, recpi, ref_thr, iou_metric#, iou_metric_min
 
 """ Helper Functioins """
 
