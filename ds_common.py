@@ -22,16 +22,17 @@ from .bbs_utils import overlay_bounding_boxes, xyxy_to_xywh, xywh_to_xyxy
 class imdb(object):
     """Image database."""
     
-    def __init__(self, name, data_path, image_set):
+    def __init__(self, name, data_path):
         self._name = name
         self._data_path = data_path
+        
         self._image_index = []
-        self._image_set = image_set
         self._gt_roidb = None
         self._gt_box_filter = None
         
-        self._image_ext = '.jpg'
-        
+        self.cfg = {
+            'image_ext': '',
+        }
         
         
     @property
@@ -86,12 +87,13 @@ class imdb(object):
         raise NotImplementedError
         
     def _load_image_set_index(self):
-        image_set_file = self._image_set
+        image_set_file = self.cfg.image_set
         assert os.path.exists(image_set_file), \
                 'Path does not exist: {}'.format(image_set_file)
        
         with open(image_set_file) as f:
-            image_index = [osp.splitext(x.strip())[0] for x in f.readlines()]
+            # image_index = [osp.splitext(x.strip())[0] for x in f.readlines()]
+            image_index = [x.strip() for x in f.readlines()]
 #            image_index = [str(Path(x.strip()).with_suffix('')) for x in f.readlines()]
                 
         return image_index
@@ -105,13 +107,13 @@ class imdb(object):
     """ Helper Functioins """
     
     def image_path_at(self, i):
-        return osp.join(self._data_path, self.image_index[i]+self._image_ext)
+        return osp.join(self._data_path, self.image_index[i]+self.cfg.image_ext)
         
     def check_and_modify_bbox(self, box, i):
         x1 = np.minimum(np.maximum(0, box[:,[0]]), self.widths[i]-2)
         y1 = np.minimum(np.maximum(0, box[:,[1]]), self.heights[i]-2)
 
-        if self.data_format == 'LTWH':
+        if self.cfg.data_format == 'LTWH':
             x2 = np.minimum(self.widths[i]-1, x1+np.maximum(1,box[:,[2]]))
             y2 = np.minimum(self.heights[i]-1, y1+np.maximum(1,box[:,[3]]))
             w = x2 - x1
@@ -188,7 +190,7 @@ class imdb(object):
         
         height = float(self.heights[i])
         gt = edict(self.gt_roidb[i])
-        gt.update(bb=xyxy_to_xywh(gt.boxes, self.data_format == 'LTRB'))
+        gt.update(bb=xyxy_to_xywh(gt.boxes, self.cfg.data_format == 'LTRB'))
 
         # keep or not according to labels
         keep = np.where([p.labels is None or c in p.labels for c in gt.cls])[0]
@@ -233,7 +235,7 @@ class imdb(object):
         
         self._gt_box_filter = map(bb_filter, gt_box_filter)
         
-        return gt_box_filter
+        # return gt_box_filter
     
     def _draw_dist(self, data):
         """Draw distribution figure of data array"""
@@ -288,7 +290,7 @@ class imdb(object):
         image_index = self.image_index[:max_num]
         image_index.append('')
 
-        lines = (self._image_ext + '\n').join(image_index)
+        lines = (self.cfg.image_ext + '\n').join(image_index) + '\n'
         with open(str(fpath), 'w') as fid:
             fid.writelines(lines)
 
@@ -303,7 +305,7 @@ class imdb(object):
         if len(boxes) == 0:
             return 
         
-        if self.data_format == 'LTWH':
+        if self.cfg.data_format == 'LTWH':
             boxes[:,2:] += boxes[:,:2] - 1
         
         cls = self.gt_roidb[i]['cls']
@@ -316,7 +318,7 @@ class imdb(object):
         doc.appendChild(anno)
         
         fname = doc.createElement('filename')
-        fname_text = doc.createTextNode(self.image_index[i]+self._image_ext)
+        fname_text = doc.createTextNode(self.image_index[i]+self.cfg.image_ext)
         fname.appendChild(fname_text)
         anno.appendChild(fname)
         
@@ -381,13 +383,13 @@ class imdb(object):
     def write_lst_with_gt(self, fname):
         fid = open(fname, 'w')
         for i in range(self.num_images):
-            line = [self.image_index[i]+self._image_ext]
+            line = [self.image_index[i]+self.cfg.image_ext]
             gt = self.gt_roidb[i]['boxes'].copy()
-            if self.data_format == 'LTRB':
+            if self.cfg.data_format == 'LTRB':
                 gt[:,2:] -= gt[:,:2] - 1
             classes = self.gt_roidb[i]['cls']
             diff_sign = 1 - 2 * self.gt_roidb[i]['diff']
-            cls = [self.labels.index(c) for c in classes] * diff_sign
+            cls = [self.cfg.labels.index(c) for c in classes] * diff_sign
             boxes = np.array(gt[:,:4], dtype = str)
             gt_line = np.column_stack((cls, boxes))
             line.extend(gt_line.reshape(-1))
@@ -398,12 +400,12 @@ class imdb(object):
     def write_lst_with_lmk(self, fname, use_diff=True, anno_len=77):
         fid = open(fname, 'w')
         for i in range(self.num_images):
-            line = [self.image_index[i]+self._image_ext]
+            line = [self.image_index[i]+self.cfg.image_ext]
             gt = self.gt_roidb[i]['boxes'].copy()
             
             no_diff = ~np.array(self.gt_roidb[i]['diff'], dtype = bool)
             gt = gt if use_diff else gt[no_diff]
-            if self.data_format == 'LTWH':
+            if self.cfg.data_format == 'LTWH':
                 gt[:,2:] += gt[:,:2] - 1
             for g in gt:
                 lbl=anno_len*2*['-1']
@@ -427,9 +429,9 @@ class imdb(object):
                 self._write_fddb_gt(i, f)
                     
     def _write_fddb_gt(self, i, f):
-        imginfo = self.image_index[i] + self._image_ext
+        imginfo = self.image_index[i] + self.cfg.image_ext
         gt = self.gt_roidb[i]['boxes'] 
-        det = xyxy_to_xywh(gt, self.data_format == 'LTRB')
+        det = xyxy_to_xywh(gt, self.cfg.data_format == 'LTRB')
         
         f.write('{:s}\n'.format(imginfo))
         f.write('{:d}\n'.format(det.shape[0]))
@@ -437,7 +439,7 @@ class imdb(object):
         classes = self.gt_roidb[i]['cls']
         # try:
         diff_sign = 1 - 2 * self.gt_roidb[i]['diff']
-        cls = [self.labels.index(c) for c in classes] * diff_sign
+        cls = [self.cfg.labels.index(c) for c in classes] * diff_sign
         # except:
             # cls = np.ones(len(classes)).astype(int)
 
@@ -449,10 +451,26 @@ class imdb(object):
             f.write('{:.1f} {:.1f} {:.1f} {:.1f} {:d}\n'.
                     format(xmin, ymin, w, h, cls[i]))
 
+    # frcnn_roi_data_file
+    def write_roi_data_file(self, fname):
+        with open(fname, 'w') as f:
+            for i in range(self.num_images):
+                self._write_roi_data(i, f)
        
-       
-
-
-
+    def _write_roi_data(self, idx, f):
+        imginfo = self.image_index[idx] + self.cfg.image_ext
+        gt = self.gt_roidb[idx]['boxes']
+        det = xywh_to_xyxy(gt, self.cfg.data_format == 'LTWH')
         
+        f.write('# {:d}\n'.format(idx))
+        f.write('{:s}\n'.format(imginfo))
         
+        diff = self.gt_roidb[idx]['diff'].astype(int)
+        
+        for i in range(det.shape[0]):
+            xmin = det[i][0]
+            ymin = det[i][1]
+            xmax = det[i][2]
+            ymax = det[i][3]
+            f.write(('{:.1f} {:.1f} {:.1f} {:.1f} {:d}\n'.
+                    format(xmin, ymin, xmax, ymax, diff[i])))
