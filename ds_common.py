@@ -211,8 +211,10 @@ class imdb(object):
 
         if not p.use_diff:
             ign = (ign | gt.diff[keep]).astype(bool)
+            
+        pid = gt.pid[keep] if 'pid' in gt.keys() else -np.ones(nObj)
         
-        return np.column_stack((gt['bb'][keep], ign))
+        return np.column_stack((gt['bb'][keep], ign, pid))
         
     
     def gt_filter(self, **filter_params):
@@ -235,7 +237,7 @@ class imdb(object):
         
         self._gt_box_filter = map(bb_filter, gt_box_filter)
         
-        # return gt_box_filter
+        return gt_box_filter
     
     def _draw_dist(self, data):
         """Draw distribution figure of data array"""

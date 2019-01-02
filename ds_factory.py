@@ -274,13 +274,16 @@ class fddb_gt(imdb):
             gt = np.array(gt, dtype=float)#.reshape((-1,5))
             if gt.shape[1] == 4:
                 gt = np.column_stack((gt, np.ones(ngt)))
-            cls = [self.cfg.labels[int(g[-1])] for g in gt]
+            cls = [self.cfg.labels[int(g[4])] for g in gt]
             diff = (gt[:,-1]<0).astype(int)
             img_index.append(im)
-            gt_roidb.append({'boxes': gt[:,:4],
-                             'cls':   cls,
-                             'diff':  diff #np.zeros(len(cls))
-                            })
+            gt_label = {'boxes': gt[:,:4],
+                         'cls':   cls,
+                         'diff':  diff, #np.zeros(len(cls))
+                       }
+            if gt.shape[1] == 6:
+                gt_label.update({'pid': gt[:, 5]})
+            gt_roidb.append(gt_label)
         
         return img_index, gt_roidb
     

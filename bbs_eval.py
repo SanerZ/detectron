@@ -61,8 +61,8 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     
     
     # check inputs
-    assert gt.shape[1]==5, 'Gt shape {} not match (ng, 5)'.format(gt.shape)
-    assert det.shape[1]==5,'Det shape {} not match (nd, 5)'.format(det.shape)
+    assert gt.shape[1]>=5, 'Gt shape {} not match (ng, 5+[id])'.format(gt.shape)
+    assert det.shape[1]>=5,'Det shape {} not match (nd, 5+[id])'.format(det.shape)
     ng, nd = gt.shape[0], det.shape[0]
     
     if np.all(det==0):
@@ -74,6 +74,8 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     det = det[sorted_ind, :]
     gt_match = -gt[:,-1:]
     dt_match = np.zeros((nd,1))
+    # dt_id = -np.ones((nd,1))
+    dt_id = np.zeros((nd,1))
 
     # go down dets and mark match flag
     for d in range(nd):
@@ -109,13 +111,14 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
                 # match success
                 gt_match[jmax] = 1
                 dt_match[d] = ovmax
+                dt_id[d] = gt[jmax][-1] if gt.shape[1]==6 else 0
     
     gt_o = np.hstack((gt, gt_match))
-    det_o = np.hstack((det, dt_match))
+    det_o = np.hstack((det[:,:5], dt_match, det[:,5:], dt_id))
                 
     return gt_o, det_o
 
-def compRoc(gt, det, use_11_points=False, ref_score=[]):
+def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
     """
     gt: groudtruth          x, y, w, h, difficult, match
     det: detection result   x, y, w, h, confidence, match(ovlap), [id]
@@ -161,7 +164,7 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
     ids, score = det_valid[:,-1], det_valid[:,4]
     
     if ref_score == []:
-        ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg)
+        ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg, custom)
         rec_hat = np.append(rec, 0)
         recpi = rec_hat[ref_idx]
         iou_hat = np.append(iou_rec, 0)
@@ -181,11 +184,14 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
 
 """ Helper Functioins """
 
-def ref_threshold(ids, score, fp, nImg, ref=0.1**np.arange(4,0,-1)):
+def ref_threshold(ids, score, fp, nImg, custom=True, ref=0.1**np.arange(4,0,-1)):
     # compute number of error images
-    fp_im = [fp[i] and im_id not in ids[:i][fp[:i]] for i,im_id in enumerate(ids)]
-    fp_im = np.cumsum(fp_im).astype(float)
-    err = fp_im/nImg
+    if custom:
+        fp_im = [fp[i] and im_id not in ids[:i][fp[:i]] for i,im_id in enumerate(ids)]
+        fp_im = np.cumsum(fp_im).astype(float)
+        err = fp_im/nImg
+    else:
+        err = np.cumsum(fp).astype(float)/len(fp)
 
     ref_idx = np.zeros(len(ref), dtype=int)
     for i, rf in enumerate(ref):
