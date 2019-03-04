@@ -72,7 +72,7 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     confidence = det[:,4]
     sorted_ind = np.argsort(-confidence)
     det = det[sorted_ind, :]
-    gt_match = -gt[:,-1:]
+    gt_match = -gt[:,[4]]
     dt_match = np.zeros((nd,1))
     # dt_id = -np.ones((nd,1))
     dt_id = np.zeros((nd,1))
@@ -113,8 +113,13 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
                 dt_match[d] = ovmax
                 dt_id[d] = gt[jmax][-1] if gt.shape[1]==6 else 0
     
-    gt_o = np.hstack((gt, gt_match))
-    det_o = np.hstack((det[:,:5], dt_match, det[:,5:], dt_id))
+    if gt.shape[1]>5 and det.shape[1]>5:
+        gt_o = np.hstack((gt[:,:5], gt_match, gt[:,5:]))
+        det_o = np.hstack((det[:,:5], dt_match, det[:,5:], dt_id))
+    else:
+        gt_o = np.hstack((gt[:,:5], gt_match))
+        det_o = np.hstack((det[:,:5], dt_match))
+        
                 
     return gt_o, det_o
 
@@ -133,8 +138,8 @@ def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
         det = [np.column_stack((d, [i]*len(d))) for i,d in enumerate(det)]
         det = np.concatenate(det, 0)
 
-    
-    npos = np.sum(gt[:,5]!=-1)
+    gt_valid = gt[gt[:,5]!=-1]
+    npos = len(gt_valid)
     det_valid = det[det[:,5]!=-1]
     det_valid = det_valid[np.argsort(-det_valid[:,4])]  # sort by scores
     
@@ -142,6 +147,7 @@ def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
     tp = (iou>0).astype(float)
     fp = 1. - tp
     fp0 = fp.astype(bool)
+    tp0 = tp.astype(bool)
     
     # compute precision recall
     fp = np.cumsum(fp)
@@ -179,8 +185,20 @@ def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
                 recpi[i] = 0
             else:
                 recpi[i] = np.max(rec[score >= thr])
+                
+    # pid
+    catch_id = 0
+    repeat_id = 0
+    if det.shape[1]>7:
+       det_pid = det_valid[tp0]
+       true_pids = np.unique(det_pid[:,7])
+       pred_pids = np.unique(det_pid[:,6])
+       gt_pids = np.unique(gt_valid[:,6])
        
-    return rec, prec, ap, recpi, ref_thr, iou_metric#, iou_metric_min
+       catch_id = len(ture_pids)/len(gt_pids)
+       repeat_id = len(pred_pids)/len(gt_pids)
+       
+    return rec, prec, ap, recpi, ref_thr, iou_metric, catch_id, repeat_id    #, iou_metric_min
 
 """ Helper Functioins """
 
