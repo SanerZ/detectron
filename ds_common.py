@@ -17,7 +17,9 @@ from xml.dom.minidom import Document
 from easydict import EasyDict as edict
 from functools import partial
 
-from .bbs_utils import overlay_bounding_boxes, xyxy_to_xywh, xywh_to_xyxy
+from .bbs_utils import overlay_bounding_boxes, xyxy_to_xywh, xywh_to_xyxy, bb_filter
+
+
 
 class imdb(object):
     """Image database."""
@@ -28,7 +30,7 @@ class imdb(object):
         
         self._image_index = []
         self._gt_roidb = None
-        self._gt_box_filter = None
+        self._gt_boxes = None
         
         self.cfg = {
             'image_ext': '',
@@ -64,16 +66,16 @@ class imdb(object):
         return self._heights
         
     @property
-    def gt_box_filter(self):
-        if self._gt_box_filter is None:
-            self._gt_box_filter = [xyxy_to_xywh(self.gt_roidb[i]['boxes'], self.data_format == 'LTRB')
-                                for i in range(self.num_images)]
-        return self._gt_box_filter
+    def gt_boxes(self):
+        if self._gt_boxes is None:
+            self.gt_filter()
+        return self._gt_boxes
             
     
     @property
     def num_objects(self):
-        return np.sum([len(self.gt_box_filter[i]) for i in range(self.num_images)])
+        gt_boxes_filter = map(bb_filter, self.gt_boxes)
+        return np.sum([len(gt_boxes_filter[i]) for i in range(self.num_images)])
 
     
     @property
@@ -212,7 +214,7 @@ class imdb(object):
         if not p.use_diff:
             ign = (ign | gt.diff[keep]).astype(bool)
             
-        pid = gt.pid[keep] if 'pid' in gt.keys() else -np.ones(nObj)
+        pid = gt.pid[keep] if 'pid' in gt.keys() else np.zeros(nObj)
         
         return np.column_stack((gt['bb'][keep], ign, pid))
         
@@ -229,15 +231,14 @@ class imdb(object):
                 }
                 
         self.filter_params.update(**filter_params)
-        gt_box_filter = [self._img_gt_filter(i) for i in range(self.num_images)]
+        self._gt_boxes = [self._img_gt_filter(i) for i in range(self.num_images)]  # [[x, y, w, h, ignore/not], ...]
         
-        def bb_filter(boxes):
-            ign = boxes[:,4].astype(bool)
-            return boxes[~ign, :4]
+        # def bb_filter(boxes):
+            # ign = boxes[:,4].astype(bool)
+            # return boxes[~ign, :4]
         
-        self._gt_box_filter = map(bb_filter, gt_box_filter)
+        # self._gt_boxes_filter = map(bb_filter, self.gt_boxes)
         
-        return gt_box_filter
     
     def _draw_dist(self, data):
         """Draw distribution figure of data array"""
@@ -256,9 +257,14 @@ class imdb(object):
         """Distribution of groundtruth number per image """
         self.gt_filter(**filter_params)
         
-        box_nums = [len(self.gt_box_filter[i]) for i in range(self.num_images)]
+        gt_boxes_filter = map(bb_filter, self.gt_boxes)
+        box_nums = [len(gt_boxes_filter[i]) for i in range(self.num_images)]
+        
+        valid_image_index = np.array(self.image_index)[np.array(box_nums)>0]
 
         den, hist = self._draw_dist(box_nums)
+        
+        return valid_image_index.tolist()
 
         
     def scale_dist(self, pix=False, **filter_params):
@@ -266,8 +272,9 @@ class imdb(object):
         self.gt_filter(**filter_params)
               
         gt_scale = list()
+        gt_boxes_filter = map(bb_filter, self.gt_boxes)
         for i in range(self.num_images):
-            box = self.gt_box_filter[i]
+            box = gt_boxes_filter[i]
             if box.shape[0] == 0:
                 continue
             
@@ -425,10 +432,12 @@ class imdb(object):
         
         
     # fddb
-    def write_fddb(self, fname):
+    def write_fddb(self, fname, sort=True):
+        index = np.argsort(self.image_index) if sort else np.arange(self.num_images) 
+        
         with open(fname, 'w') as f:
-            for i in range(self.num_images):
-                self._write_fddb_gt(i, f)
+            for i, idx  in enumerate(index):
+                self._write_fddb_gt(idx, f)
                     
     def _write_fddb_gt(self, i, f):
         imginfo = self.image_index[i] + self.cfg.image_ext
@@ -452,6 +461,13 @@ class imdb(object):
             h = det[i][3]
             f.write('{:.1f} {:.1f} {:.1f} {:.1f} {:d}\n'.
                     format(xmin, ymin, w, h, cls[i]))
+                    
+    def write_det_file(self, fname):
+        gt_boxes_filter = map(bb_filter, self.gt_boxes)
+        index_list = [[idx] * len(g) for idx, g in enumerate(gt_boxes_filter)]
+        index_list = reduce(lambda x,y:x+y, index_list)
+        dets = np.column_stack((index_list, np.concatenate(gt_boxes_filter), np.ones(len(index_list))))
+        np.savetxt(fname, dets, fmt='%d %.2f %.2f %.2f %.2f %d')
 
     # frcnn_roi_data_file
     def write_roi_data_file(self, fname):
