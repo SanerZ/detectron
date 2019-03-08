@@ -11,7 +11,7 @@ import cv2
 from .bbs_utils import overlay_bounding_boxes
 
 # Display evaluation results for given image and save
-def output_bounding_boxes(raw_img, gt=[], det=[], **params):
+def output_bounding_boxes(raw_img, gt=[], det=[], gt_out=None, **params):
     def preprocess(box_in):
         box = np.array(box_in).reshape((-1,6)) if box_in == [] \
             else box_in[box_in[:,-1]!=-1]
@@ -19,12 +19,14 @@ def output_bounding_boxes(raw_img, gt=[], det=[], **params):
             box = np.column_stack((box, 1))
         return box
     
-    show_params = dict(thr=0, evShow=1, outpath=None)
+    show_params = dict(thr=0, evShow=1, outpath=None, evSave=0)
     show_params.update(params)
     
     g = preprocess(gt)
     dt = preprocess(det)
     dt = dt[dt[:,4]>=show_params['thr']]
+    
+    gt_fileout = show_params['evSave']
     
     if show_params['evShow'] and np.all(g[:,-1]) == 1 and np.all(dt[:,-1]) == 1:
         return 
@@ -37,6 +39,9 @@ def output_bounding_boxes(raw_img, gt=[], det=[], **params):
     if show_params['outpath']:
         img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
         cv2.imwrite(show_params['outpath'], img)
+    
+    g_out = g[g[:,-1]==0] if gt_fileout else None
+    return g_out
     
 
 def evalRes(gt, det, ovthresh=0.5, multi_match=False):
