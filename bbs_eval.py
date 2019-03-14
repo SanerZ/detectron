@@ -113,8 +113,8 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
                 gt_match[jmax] = 1
                 dt_match[d] = ovmax
     
-        gt_o = np.hstack((gt, gt_match))
-        det_o = np.hstack((det, dt_match))
+    gt_o = np.hstack((gt, gt_match))
+    det_o = np.hstack((det, dt_match))
         
                 
     return gt_o, det_o
