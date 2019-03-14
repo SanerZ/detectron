@@ -15,10 +15,9 @@ def calc_overlaps(bs1, bs2, wh=False):
     ovs = []
     b1 = bs1.copy()
     b2 = bs2.copy()
-    
-    if wh:
-        b1 = boxFormatTransform(b1, wh)
-        b2 = boxFormatTransform(b2, wh)
+
+    b1 = xywh_to_xyxy(b1, wh)
+    b2 = xywh_to_xyxy(b2, wh)
         
     for b in b1:
         ov = bbox_overlap(b2, b)
@@ -47,14 +46,26 @@ def bbox_overlap(bs, b):
 
 """ Transformation Functions """
 
-def boxFormatTransform(box, wh=True):
-    target_box = box.copy()
-    if wh:
-        target_box[:, 2:4] += target_box[:, :2] - 1
-    else:
-        target_box[:, 2:4] -= target_box[:, :2] - 1
+def xywh_to_xyxy(boxes, sw=True):
+    """Convert [x y w h] box format to [x1 y1 x2 y2] format."""
+    if not sw:
+        return boxes
+    return np.hstack((boxes[:, 0:2], boxes[:, 0:2] + boxes[:, 2:4] - 1, boxes[:, 4:]))
+
+def xyxy_to_xywh(boxes, sw=True):
+    """Convert [x1 y1 x2 y2] box format to [x y w h] format."""
+    if not sw:
+        return boxes
+    return np.hstack((boxes[:, 0:2], boxes[:, 2:4] - boxes[:, 0:2] + 1, boxes[:, 4:]))
+
+# def boxFormatTransform(box, wh=True):
+    # target_box = box.copy()
+    # if wh:
+        # target_box[:, 2:4] += target_box[:, :2] - 1
+    # else:
+        # target_box[:, 2:4] -= target_box[:, :2] - 1
     
-    return target_box
+    # return target_box
 
 def boxResize(bb, hr=1, wr=0, ar=0):
     """
@@ -119,7 +130,7 @@ def overlay_bounding_boxes(raw_img, refined_bboxes, lw=2, color=None, actFun=ide
     """
 
     # Overlay bounding boxes on an image with the color based on the confidence.
-    rbs = boxFormatTransform(refined_bboxes, wh) if wh else refined_bboxes
+    rbs = xywh_to_xyxy(refined_bboxes, wh)
     for r in rbs:
         if color:
             rect_color = color
