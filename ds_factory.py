@@ -37,7 +37,7 @@ class pascal_voc(imdb):
                 'image_ext': '.jpg',
         }
         self.cfg.update(self._cfg)
-        self.cfg.update(**ds_params)
+#        self.cfg.update(**ds_params)
         self.cfg = edict(self.cfg)
         
         self._image_index = self._load_image_set_index()
