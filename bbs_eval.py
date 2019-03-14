@@ -10,11 +10,6 @@ import cv2
 
 from .bbs_utils import overlay_bounding_boxes
 
-show_params = {
-    'thr'       : 0.,
-    'evShow'    : 1,
-    'outpath'   : None,
-}
 # Display evaluation results for given image and save
 def output_bounding_boxes(raw_img, gt=[], det=[], **params):
     def preprocess(box_in):
@@ -24,22 +19,28 @@ def output_bounding_boxes(raw_img, gt=[], det=[], **params):
             box = np.column_stack((box, 1))
         return box
     
+    show_params = dict(thr=0, evShow=1, outpath=None)
     show_params.update(params)
+    
     g = preprocess(gt)
     dt = preprocess(det)
     dt = dt[dt[:,4]>=show_params['thr']]
+    
     
     if show_params['evShow'] and np.all(g[:,-1]) == 1 and np.all(dt[:,-1]) == 1:
         return 
     
     overlay_bounding_boxes(raw_img, g, color=[255,0,0], wh=True)
-    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==1], wh=True)
-    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], color=[0,255,0], wh=True)
+    overlay_bounding_boxes(raw_img, dt[dt[:,5]>0.45], wh=True)
+    # overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], color=[0,255,0], wh=True)
+    overlay_bounding_boxes(raw_img, dt[dt[:,5]<=0.45], wh=True)
     
     if show_params['outpath']:
         img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(show_params['outpath'], img)
-    
+        shrink = 500./max(img.shape[0], img.shape[1])
+        im = cv2.resize(img, None, None, fx=shrink, fy=shrink, interpolation=cv2.INTER_LINEAR)
+        cv2.imwrite(show_params['outpath'], im)
+        
 
 def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     """
@@ -63,8 +64,8 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     
     
     # check inputs
-    assert gt.shape[1]==5, 'Gt shape {} not match (ng, 5)'.format(gt.shape)
-    assert det.shape[1]==5,'Det shape {} not match (nd, 5)'.format(det.shape)
+    assert gt.shape[1]==5, 'Gt shape {} not match (ng, 5+[...])'.format(gt.shape)
+    assert det.shape[1]==5,'Det shape {} not match (nd, 5+[...])'.format(det.shape)
     ng, nd = gt.shape[0], det.shape[0]
     
     if np.all(det==0):
@@ -74,7 +75,7 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     confidence = det[:,4]
     sorted_ind = np.argsort(-confidence)
     det = det[sorted_ind, :]
-    gt_match = -gt[:,-1:]
+    gt_match = -gt[:,[4]]
     dt_match = np.zeros((nd,1))
 
     # go down dets and mark match flag
@@ -110,17 +111,18 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
             else:
                 # match success
                 gt_match[jmax] = 1
-                dt_match[d] = 1
+                dt_match[d] = ovmax
     
-    gt_o = np.hstack((gt, gt_match))
-    det_o = np.hstack((det, dt_match))
+        gt_o = np.hstack((gt, gt_match))
+        det_o = np.hstack((det, dt_match))
+        
                 
     return gt_o, det_o
 
-def compRoc(gt, det, use_11_points=False, ref_score=[]):
+def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
     """
     gt: groudtruth          x, y, w, h, difficult, match
-    det: detection result   x, y, w, h, confidence, match, [id]
+    det: detection result   x, y, w, h, confidence, match(ovlap), [id]
     ref: false percentage to display recall list   
              default        [0.0001, 0.001 , 0.01  , 0.1]
     """
@@ -132,14 +134,16 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
         det = [np.column_stack((d, [i]*len(d))) for i,d in enumerate(det)]
         det = np.concatenate(det, 0)
 
-    
-    npos = np.sum(gt[:,5]!=-1)
+    gt_valid = gt[gt[:,5]!=-1]
+    npos = len(gt_valid)
     det_valid = det[det[:,5]!=-1]
     det_valid = det_valid[np.argsort(-det_valid[:,4])]  # sort by scores
     
-    tp = det_valid[:,5]
+    iou = det_valid[:,5]
+    tp = (iou>0).astype(float)
     fp = 1. - tp
     fp0 = fp.astype(bool)
+    tp0 = tp.astype(bool)
     
     # compute precision recall
     fp = np.cumsum(fp)
@@ -150,34 +154,47 @@ def compRoc(gt, det, use_11_points=False, ref_score=[]):
     prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
     ap = voc_ap(rec, prec, use_11_points)
     
+    iou_rec = np.cumsum(iou)
+    iou_rec = iou_rec / tp
+
+    
     if det.shape[1]<7:
-        return rec, prec, ap
+        return rec, prec, ap, iou_rec
     
     # compute number of error images
     ids, score = det_valid[:,-1], det_valid[:,4]
     
     if ref_score == []:
-        ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg)
+        ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg, custom)
         rec_hat = np.append(rec, 0)
         recpi = rec_hat[ref_idx]
+        iou_hat = np.append(iou_rec, 0)
+        # iou_metric = rec_hat[ref_idx]
+        iou_metric = iou_hat[ref_idx]
+        # iou_metric_min = [min(iou[:idx+1]) for idx in ref_idx] 
     else:
         ref_thr = ref_score
         recpi = np.zeros(len(ref_thr))
+        iou_metric = np.zeros(len(ref_thr))
         for i, thr in enumerate(ref_thr):
             if np.sum(score >= thr) == 0:
                 recpi[i] = 0
             else:
                 recpi[i] = np.max(rec[score >= thr])
-       
-    return rec, prec, ap, recpi, ref_thr
+                iou_metric[i] = iou_rec[np.argmax(rec[score >= thr])]
+                
+    return rec, prec, ap, recpi, ref_thr, iou_metric   #, iou_metric_min
 
 """ Helper Functioins """
 
-def ref_threshold(ids, score, fp, nImg, ref=0.1**np.arange(4,0,-1)):
+def ref_threshold(ids, score, fp, nImg, custom=True, ref=0.1**np.arange(4,0,-1)):
     # compute number of error images
-    fp_im = [fp[i] and im_id not in ids[:i][fp[:i]] for i,im_id in enumerate(ids)]
-    fp_im = np.cumsum(fp_im).astype(float)
-    err = fp_im/nImg
+    if custom:
+        fp_im = [fp[i] and im_id not in ids[:i][fp[:i]] for i,im_id in enumerate(ids)]
+        fp_im = np.cumsum(fp_im).astype(float)
+        err = fp_im/nImg
+    else:
+        err = np.cumsum(fp).astype(float)/len(fp)
 
     ref_idx = np.zeros(len(ref), dtype=int)
     for i, rf in enumerate(ref):

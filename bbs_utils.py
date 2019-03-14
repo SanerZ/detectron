@@ -57,6 +57,10 @@ def xyxy_to_xywh(boxes, sw=True):
     if not sw:
         return boxes
     return np.hstack((boxes[:, 0:2], boxes[:, 2:4] - boxes[:, 0:2] + 1, boxes[:, 4:]))
+    
+def bb_filter(boxes):
+    ign = boxes[:,4].astype(bool)
+    return boxes[~ign, :4]
 
 # def boxFormatTransform(box, wh=True):
     # target_box = box.copy()
@@ -147,6 +151,8 @@ def overlay_bounding_boxes(raw_img, refined_bboxes, lw=2, color=None, actFun=ide
 
         _r = [int(x) for x in r[:4]]
         cv2.rectangle(raw_img, (_r[0], _r[1]), (_r[2], _r[3]), rect_color, _lw)
+        if len(_r) > 5:
+            cv2.putText(raw_img, str(_r[3]), (_r[0]-30, _r[1]-30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), _lw*2)
 
 # colormap parula borrowed from
 # https://github.com/BIDS/colormap/blob/master/fake_parula.py
