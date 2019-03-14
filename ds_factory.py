@@ -252,7 +252,8 @@ class fddb_gt(imdb):
         assert osp.exists(self._gt_lst), \
                 'Path does not exist: {}'.format(self._gt_lst)
         
-        if self.cfg.image_set:
+        image_set = self.cfg.get('image_set','')
+        if image_set:
             self._image_index = self._load_image_set_index()
         
         img_index = list()
@@ -267,7 +268,7 @@ class fddb_gt(imdb):
             ngt = int(dts[i+1].strip())
             i += ngt+2
             
-            if ngt == 0 or self.cfg.image_set and im not in self._image_index:
+            if ngt == 0 or image_set and im not in self._image_index:
                 continue
                 
             gt = [g.strip().split() for g in dts[i-ngt:i]]
