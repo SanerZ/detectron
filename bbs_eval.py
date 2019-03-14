@@ -11,7 +11,7 @@ import cv2
 from .bbs_utils import overlay_bounding_boxes
 
 # Display evaluation results for given image and save
-def output_bounding_boxes(raw_img, gt=[], det=[], gt_out=None, **params):
+def output_bounding_boxes(raw_img, gt=[], det=[], **params):
     def preprocess(box_in):
         box = np.array(box_in).reshape((-1,6)) if box_in == [] \
             else box_in[box_in[:,-1]!=-1]
@@ -19,30 +19,28 @@ def output_bounding_boxes(raw_img, gt=[], det=[], gt_out=None, **params):
             box = np.column_stack((box, 1))
         return box
     
-    show_params = dict(thr=0, evShow=1, outpath=None, evSave=0)
+    show_params = dict(thr=0, evShow=1, outpath=None)
     show_params.update(params)
     
     g = preprocess(gt)
     dt = preprocess(det)
     dt = dt[dt[:,4]>=show_params['thr']]
     
-    gt_fileout = show_params['evSave']
     
     if show_params['evShow'] and np.all(g[:,-1]) == 1 and np.all(dt[:,-1]) == 1:
         return 
     
     overlay_bounding_boxes(raw_img, g, color=[255,0,0], wh=True)
-    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==1], wh=True)
+    overlay_bounding_boxes(raw_img, dt[dt[:,5]>0.45], wh=True)
     # overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], color=[0,255,0], wh=True)
-    overlay_bounding_boxes(raw_img, dt[dt[:,-1]==0], wh=True)
+    overlay_bounding_boxes(raw_img, dt[dt[:,5]<=0.45], wh=True)
     
     if show_params['outpath']:
         img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(show_params['outpath'], img)
-    
-    g_out = g[g[:,-1]==0] if gt_fileout else None
-    return g_out
-    
+        shrink = 500./max(img.shape[0], img.shape[1])
+        im = cv2.resize(img, None, None, fx=shrink, fy=shrink, interpolation=cv2.INTER_LINEAR)
+        cv2.imwrite(show_params['outpath'], im)
+        
 
 def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     """
@@ -66,8 +64,8 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     
     
     # check inputs
-    assert gt.shape[1]>=5, 'Gt shape {} not match (ng, 5+[id])'.format(gt.shape)
-    assert det.shape[1]>=5,'Det shape {} not match (nd, 5+[id])'.format(det.shape)
+    assert gt.shape[1]==5, 'Gt shape {} not match (ng, 5+[...])'.format(gt.shape)
+    assert det.shape[1]==5,'Det shape {} not match (nd, 5+[...])'.format(det.shape)
     ng, nd = gt.shape[0], det.shape[0]
     
     if np.all(det==0):
@@ -79,8 +77,6 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     det = det[sorted_ind, :]
     gt_match = -gt[:,[4]]
     dt_match = np.zeros((nd,1))
-    # dt_id = -np.ones((nd,1))
-    dt_id = np.zeros((nd,1))
 
     # go down dets and mark match flag
     for d in range(nd):
@@ -116,14 +112,9 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
                 # match success
                 gt_match[jmax] = 1
                 dt_match[d] = ovmax
-                dt_id[d] = gt[jmax][-1] if gt.shape[1]==6 else 0
     
-    if gt.shape[1]>5 and det.shape[1]>5:
-        gt_o = np.hstack((gt[:,:5], gt_match, gt[:,5:]))
-        det_o = np.hstack((det[:,:5], dt_match, det[:,5:], dt_id))
-    else:
-        gt_o = np.hstack((gt[:,:5], gt_match))
-        det_o = np.hstack((det[:,:5], dt_match))
+        gt_o = np.hstack((gt, gt_match))
+        det_o = np.hstack((det, dt_match))
         
                 
     return gt_o, det_o
@@ -165,8 +156,7 @@ def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
     
     iou_rec = np.cumsum(iou)
     iou_rec = iou_rec / tp
-    # iou[iou==0]=1.1
-    # print iou_rec
+
     
     if det.shape[1]<7:
         return rec, prec, ap, iou_rec
@@ -180,30 +170,20 @@ def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
         recpi = rec_hat[ref_idx]
         iou_hat = np.append(iou_rec, 0)
         # iou_metric = rec_hat[ref_idx]
-        iou_metric = iou_rec[ref_idx]
+        iou_metric = iou_hat[ref_idx]
         # iou_metric_min = [min(iou[:idx+1]) for idx in ref_idx] 
     else:
         ref_thr = ref_score
         recpi = np.zeros(len(ref_thr))
+        iou_metric = np.zeros(len(ref_thr))
         for i, thr in enumerate(ref_thr):
             if np.sum(score >= thr) == 0:
                 recpi[i] = 0
             else:
                 recpi[i] = np.max(rec[score >= thr])
+                iou_metric[i] = iou_rec[np.argmax(rec[score >= thr])]
                 
-    # pid
-    catch_id = 0
-    repeat_id = 0
-    if det.shape[1]>7:
-       det_pid = det_valid[tp0]
-       true_pids = np.unique(det_pid[:,7])
-       pred_pids = np.unique(det_pid[:,6])
-       gt_pids = np.unique(gt_valid[:,6])
-       
-       catch_id = len(ture_pids)/len(gt_pids)
-       repeat_id = len(pred_pids)/len(gt_pids)
-       
-    return rec, prec, ap, recpi, ref_thr, iou_metric, catch_id, repeat_id    #, iou_metric_min
+    return rec, prec, ap, recpi, ref_thr, iou_metric   #, iou_metric_min
 
 """ Helper Functioins """
 

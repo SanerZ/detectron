@@ -213,10 +213,8 @@ class imdb(object):
 
         if not p.use_diff:
             ign = (ign | gt.diff[keep]).astype(bool)
-            
-        pid = gt.pid[keep] if 'pid' in gt.keys() else np.zeros(nObj)
         
-        return np.column_stack((gt['bb'][keep], ign, pid))
+        return np.column_stack((gt['bb'][keep], ign))
         
     
     def gt_filter(self, **filter_params):

@@ -281,8 +281,6 @@ class fddb_gt(imdb):
                          'cls':   cls,
                          'diff':  diff, #np.zeros(len(cls))
                        }
-            if gt.shape[1] == 6:
-                gt_label.update({'pid': gt[:, 5]})
             gt_roidb.append(gt_label)
         
         return img_index, gt_roidb
