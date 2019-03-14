@@ -314,7 +314,8 @@ class imdb(object):
          
     #### create voc-like xml
     def _write_voc_xml(self, i, outdir):
-        f_xml = osp.join(outdir, self.image_index[i] +'.xml')  #osp.splitext(self.image_index[i])[0]
+        img_name = osp.splitext(self.image_index[i])[0]
+        f_xml = osp.join(outdir, img_name +'.xml')  #osp.splitext(self.image_index[i])[0]
         
         boxes = self.gt_roidb[i]['boxes'].copy()
         if len(boxes) == 0:
