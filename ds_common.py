@@ -132,6 +132,7 @@ class imdb(object):
         
         self.filter_params = {
                 'filterGt':     self._filterGtFun,
+                'top1':         False,
                 'labels':       None,     
                 'use_diff':     False,
                 }
@@ -210,11 +211,17 @@ class imdb(object):
             filter_params = dict(zip(valid_keys, filter_values))
             ign.append(not filterGt(**filter_params))
         ign = np.array(ign, dtype=bool)
-
+        
+        gt_keep = gt['bb'][keep]
         if not p.use_diff:
             ign = (ign | gt.diff[keep]).astype(bool)
         
-        return np.column_stack((gt['bb'][keep], ign))
+        if p.top1:
+            ign = np.ones(np.shape(ign))
+            max_idx = np.argmax(gt_keep[:,3])
+            ign[max_idx] = 0
+        
+        return np.column_stack((gt_keep, ign))
         
     
     def gt_filter(self, **filter_params):
@@ -224,6 +231,7 @@ class imdb(object):
         """
         self.filter_params = {
                 'filterGt':     self._filterGtFun,
+                'top1':         False,
                 'labels':       None,     
                 'use_diff':     False,
                 }
