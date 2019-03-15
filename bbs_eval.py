@@ -64,8 +64,8 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
     
     
     # check inputs
-    assert gt.shape[1]==5, 'Gt shape {} not match (ng, 5+[...])'.format(gt.shape)
-    assert det.shape[1]==5,'Det shape {} not match (nd, 5+[...])'.format(det.shape)
+    assert gt.shape[1]>=5, 'Gt shape {} not match (ng, 5+[...])'.format(gt.shape)
+    assert det.shape[1]>=5,'Det shape {} not match (nd, 5+[...])'.format(det.shape)
     ng, nd = gt.shape[0], det.shape[0]
     
     if np.all(det==0):
