@@ -173,7 +173,7 @@ class imdb(object):
         h = bb[3]                   
         p = h>=hr[0] and h<hr[1]                    # height range
         
-        return p
+        return [p]
     
     def _img_gt_filter(self, i):
         """
@@ -209,12 +209,13 @@ class imdb(object):
         for idx in keep:
             filter_values = map(lambda x:gt[x][idx], valid_keys)
             filter_params = dict(zip(valid_keys, filter_values))
-            ign.append(not filterGt(**filter_params))
-        ign = np.array(ign, dtype=bool)
+            ign.append(~np.array(filterGt(**filter_params)))
+        ign = np.array(ign, dtype=bool)   # shape (n,)  --> (n, 1 + n_labels)
         
         gt_keep = gt['bb'][keep]
         if not p.use_diff:
-            ign = (ign | gt.diff[keep]).astype(bool)
+            diff = np.repeat(gt.diff[keep].reshape(-1,1), ign.shape[1], axis=1)
+            ign = (ign | diff).astype(bool)
         
         if p.top1:
             ign = np.ones(np.shape(ign))

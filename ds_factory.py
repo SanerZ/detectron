@@ -123,7 +123,9 @@ class fcn_gt(imdb):
         self.cfg.update(self._cfg)
         self.cfg.update(**ds_params)
         self.cfg = edict(self.cfg)
-        
+        if type(self.cfg.labels) == str:
+            self.cfg.labels = eval(self.cfg.labels)
+            
         
         self._image_index, self._gt_roidb = self._load_gt_lst()
         
@@ -184,6 +186,8 @@ class fcn_lmk(imdb):
         self.cfg.update(self._cfg)
         self.cfg.update(**ds_params)
         self.cfg = edict(self.cfg)
+        if type(self.cfg.labels) == str:
+            self.cfg.labels = eval(self.cfg.labels)
         
         self._image_index, self._gt_roidb = self._load_lmk_lst()
         
@@ -229,11 +233,6 @@ class fddb_gt(imdb):
         imdb.__init__(self, name, data_path)
         self._gt_lst = gt_lst
         
-        # self.data_format = 'LTWH'
-        # self.labels = [
-                # 'background',
-                # 'face',
-                # ]
         self._cfg = edict({
                 'data_format': 'LTWH',
                 'labels': [
@@ -244,6 +243,8 @@ class fddb_gt(imdb):
         self.cfg.update(self._cfg)
         self.cfg.update(**ds_params)
         self.cfg = edict(self.cfg)
+        if type(self.cfg.labels) == str:
+            self.cfg.labels = eval(self.cfg.labels)
                 
         self._image_index, self._gt_roidb = self._load_fddb_gt()
 
