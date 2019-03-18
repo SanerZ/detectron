@@ -218,7 +218,7 @@ class fcn_lmk(imdb):
                 img_index.append(im)
                 gt_roidb.append({'boxes': gt,
                                  'cls':   self.cfg.labels * gt.shape[0],
-                                 'diff':  np.zeros(gt.shape[0])
+                                 'diff':  np.zeros(gt.shape[0]).astype(int)
                                 })
         return img_index, gt_roidb
         
