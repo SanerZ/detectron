@@ -440,33 +440,41 @@ class imdb(object):
         
         
     # fddb
-    def write_fddb(self, fname, sort=True):
+    def write_fddb(self, fname, sort=False, use_diff=True):
         index = np.argsort(self.image_index) if sort else np.arange(self.num_images) 
         
         with open(fname, 'w') as f:
             for i, idx  in enumerate(index):
-                self._write_fddb_gt(idx, f)
+                self._write_fddb_gt(idx, f, use_diff)
                     
-    def _write_fddb_gt(self, i, f):
-        imginfo = self.image_index[i] + self.cfg.image_ext
-        gt = self.gt_roidb[i]['boxes'] 
-        det = xyxy_to_xywh(gt, self.cfg.data_format == 'LTRB')
+    def _write_fddb_gt(self, idx, f, use_diff):
+        imginfo = self.image_index[idx] + self.cfg.image_ext
+        
+        no_diff = ~np.array(self.gt_roidb[idx]['diff'], dtype=bool)
+        if use_diff:
+            gt_roidb = self.gt_roidb[idx]
+        else:
+            gt_roidb = dict()
+            for k,v in self.gt_roidb[idx].items():
+                gt_roidb[k] = np.array(v)[no_diff]
+                
+        gt = xyxy_to_xywh(gt_roidb['boxes'], self.cfg.data_format == 'LTRB')
         
         f.write('{:s}\n'.format(imginfo))
-        f.write('{:d}\n'.format(det.shape[0]))
+        f.write('{:d}\n'.format(gt.shape[0]))
         
-        classes = self.gt_roidb[i]['cls']
+        classes = gt_roidb['cls']
         # try:
-        diff_sign = 1 - 2 * self.gt_roidb[i]['diff']
+        diff_sign = 1 - 2 * gt_roidb['diff']
         cls = [self.cfg.labels.index(c) for c in classes] * diff_sign
         # except:
             # cls = np.ones(len(classes)).astype(int)
 
-        for i in range(det.shape[0]):
-            xmin = det[i][0]
-            ymin = det[i][1]
-            w = det[i][2]
-            h = det[i][3]
+        for i in range(gt.shape[0]):
+            xmin = gt[i][0]
+            ymin = gt[i][1]
+            w = gt[i][2]
+            h = gt[i][3]
             f.write('{:.1f} {:.1f} {:.1f} {:.1f} {:d}\n'.
                     format(xmin, ymin, w, h, cls[i]))
                     
