@@ -252,7 +252,8 @@ class fddb_gt(imdb):
     def _load_fddb_gt(self):
         assert osp.exists(self._gt_lst), \
                 'Path does not exist: {}'.format(self._gt_lst)
-        
+
+        angle_cls = eval(self.cfg.get('angle_cls', 'False'))       
         image_set = self.cfg.get('image_set','')
         if image_set:
             self._image_index = self._load_image_set_index()
@@ -276,13 +277,16 @@ class fddb_gt(imdb):
             gt = np.array(gt, dtype=float)#.reshape((-1,5))
             if gt.shape[1] == 4:
                 gt = np.column_stack((gt, np.ones(ngt)))
-            cls = [self.cfg.labels[int(g[4])] for g in gt]
-            diff = (gt[:,-1]<0).astype(int)
+            cls = [self.cfg.labels[abs(int(g[4]))] for g in gt]
+            diff = (gt[:,4]<0).astype(int)
             img_index.append(im)
             gt_label = {'boxes': gt[:,:4],
                          'cls':   cls,
                          'diff':  diff, #np.zeros(len(cls))
                        }
+            if angle_cls：
+                frontal = gt[:, 5]==1
+                gt_label.update({'frontal':frontal})
             gt_roidb.append(gt_label)
         
         return img_index, gt_roidb
