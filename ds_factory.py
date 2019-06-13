@@ -286,5 +286,12 @@ class fddb_gt(imdb):
             gt_roidb.append(gt_label)
         
         return img_index, gt_roidb
+
+
+"""
+                REC_GT DATASET
+"""
+
+
     
 

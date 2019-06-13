@@ -444,7 +444,7 @@ class imdb(object):
         index = np.argsort(self.image_index) if sort else np.arange(self.num_images) 
         
         with open(fname, 'w') as f:
-            for i, idx  in enumerate(index):
+            for idx in index:
                 self._write_fddb_gt(idx, f, use_diff)
                     
     def _write_fddb_gt(self, idx, f, use_diff):
@@ -508,3 +508,30 @@ class imdb(object):
             ymax = det[i][3]
             f.write(('{:.1f} {:.1f} {:.1f} {:.1f} {:d}\n'.
                     format(xmin, ymin, xmax, ymax, diff[i])))
+
+    # rec_file for gluon
+    def write_rec_file(self, fname):
+        with open(fname, 'w') as f:
+            for i in range(self.num_images):
+                self._write_rec_line(i, f)
+                if i < self.num_images-1:
+                    f.write('\n')
+
+    def _write_rec_line(self, idx, f):
+        header = [str(idx), '4', '9']
+        img_size = [str(self.widths[idx]), str(self.heights[idx])]
+        boxes = self.gt_boxes[idx][:,:4]
+        nboxes = boxes.shape[0]
+        if self.cfg.data_format == 'LTWH':
+            boxes = xywh_to_xyxy(boxes)
+        WH = np.tile(img_size, reps=(1,2)).astype(int)
+        boxes = np.round(boxes / WH, decimals=3).astype(str)
+        attr = (-np.ones((nboxes, 4))).astype(int).astype(str)
+        boxes = np.column_stack((boxes, attr))
+        boxes = np.column_stack((['0']* nboxes, boxes))
+        boxes = boxes.flatten().tolist()
+
+        line = header + img_size + boxes
+        f.write('\t'.join(line))
+        # f.write('\n')
+
