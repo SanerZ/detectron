@@ -133,6 +133,7 @@ class imdb(object):
         self.filter_params = {
                 'filterGt':     self._filterGtFun,
                 'top1':         False,
+                'frontal':      False,
                 'labels':       None,     
                 'use_diff':     False,
                 }
@@ -218,9 +219,14 @@ class imdb(object):
             ign = (ign | diff).astype(bool)
         
         if p.top1:
-            ign = np.ones(np.shape(ign))
+            ign_tpk1 = np.ones(np.shape(ign))
             max_idx = np.argmax(gt_keep[:,3])
-            ign[max_idx] = 0
+            ign_tpk1[max_idx] = 0
+            ign = ign | ign_tpk1.astype(bool)
+            
+        if p.frontal:
+            ign_frontal = ~gt.frontal[keep]
+            ign = ign | ign_frontal
         
         return np.column_stack((gt_keep, ign))
         
@@ -233,6 +239,7 @@ class imdb(object):
         self.filter_params = {
                 'filterGt':     self._filterGtFun,
                 'top1':         False,
+                'frontal':      False,
                 'labels':       None,     
                 'use_diff':     False,
                 }
@@ -306,7 +313,7 @@ class imdb(object):
         image_index = self.image_index[:max_num]
         image_index.append('')
 
-        lines = (self.cfg.image_ext + '\n').join(image_index) + '\n'
+        lines = (self.cfg.image_ext + '\n').join(image_index)
         with open(str(fpath), 'w') as fid:
             fid.writelines(lines)
 
@@ -444,7 +451,7 @@ class imdb(object):
         index = np.argsort(self.image_index) if sort else np.arange(self.num_images) 
         
         with open(fname, 'w') as f:
-            for idx in index:
+            for i, idx  in enumerate(index):
                 self._write_fddb_gt(idx, f, use_diff)
                     
     def _write_fddb_gt(self, idx, f, use_diff):
@@ -534,4 +541,3 @@ class imdb(object):
         line = header + img_size + boxes
         f.write('\t'.join(line))
         # f.write('\n')
-
