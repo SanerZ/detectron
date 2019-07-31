@@ -12,6 +12,7 @@ from ConfigParser import ConfigParser
 
 import xml.etree.ElementTree as ET
 from easydict import EasyDict as edict
+import json
 
 from .ds_common import imdb
 
@@ -30,7 +31,7 @@ def ds_factory(ds_name):
 """
 class pascal_voc(imdb):
     def __init__(self, name, data_path, image_set):
-        imdb.__init__(self, name, data_path, image_set)
+        imdb.__init__(self, name, data_path)
         
         self._cfg = {
                 'data_format': 'LTRB',
@@ -39,12 +40,13 @@ class pascal_voc(imdb):
         self.cfg.update(self._cfg)
 #        self.cfg.update(**ds_params)
         self.cfg = edict(self.cfg)
-        
+
+        self._image_set = image_set
         self._image_index = self._load_image_set_index()
         
       
     def image_path_at(self, i):
-        return osp.join(self._data_path, 'JPEGImages', self.image_index[i]+self._image_ext)           
+        return osp.join(self._data_path, 'JPEGImages', self.image_index[i]+self.cfg.image_ext)
 
     def _load_image_set_index(self):
         image_set_file = os.path.join(self._data_path, 'ImageSets', 'Main',
@@ -101,6 +103,79 @@ class pascal_voc(imdb):
         self._widths = np.zeros((self.num_images), dtype=np.int16)
         self._heights = np.zeros((self.num_images), dtype=np.int16)
         return [self._load_xml_annotation(i) for i in range(self.num_images)]
+
+
+"""
+                CITY_PERSON DATASET
+"""
+
+
+class city_person(imdb):
+    def __init__(self, name, data_path, image_set):
+        imdb.__init__(self, name, data_path)
+
+        self._cfg = {
+            'data_format': 'LTWH',
+            'image_ext': 'leftImg8bit.png',
+            'json_ext': 'gtBboxCityPersons.json',
+        }
+        self.cfg.update(self._cfg)
+        #        self.cfg.update(**ds_params)
+        self.cfg = edict(self.cfg)
+
+        self._image_set = image_set
+        self._image_index = self._load_image_set_index()  # aachen_000000_000019 [_xxx.png]
+
+    def image_path_at(self, i):
+        return osp.join(self._data_path, self.image_index[i] + self.cfg.image_ext)
+
+    def _load_image_set_index(self):
+        image_set_file = os.path.join(self._data_path, self._image_set)
+        assert os.path.exists(image_set_file), \
+            'Path does not exist: {}'.format(image_set_file)
+
+        with open(image_set_file) as f:
+            image_index = [x.strip() for x in f.readlines()]
+
+        return image_index
+
+    def _load_json_annotation(self, i):
+        """
+        Load image and bounding boxes info from XML file in the PASCAL VOC
+        format.
+        """
+        filename = os.path.join(self._data_path, 'annotations', self.image_index[i] + self.cfg.json_ext)
+        with open(filename, 'r') as f:
+            annos = json.load(f)
+
+        self._widths[i] = annos['imgWidth']
+        self._heights[i] = annos['imgHeight']
+
+        objs = annos['objects']
+        num_objs = len(objs)
+
+        boxes = np.zeros((num_objs, 4), dtype=np.float)
+        gt_classes = ['']*num_objs
+        diff = np.zeros(num_objs, dtype=bool)
+
+        # Load object bounding boxes into a data frame.
+        for ix, obj in enumerate(objs):
+            boxes[ix, :] = obj['bbox']
+            gt_classes[ix] = obj['label']
+            # diff[ix] = False
+        #            diff[ix] = min(x2-x1, y2-y1)<30
+        gt_classes = np.array(gt_classes).astype(str)
+        valid = gt_classes != 'ignore'
+
+        return {'boxes': boxes[valid],
+                'cls': gt_classes[valid],
+                'diff': diff[valid]
+                }
+
+    def _get_gt_roidb(self):
+        self._widths = np.zeros((self.num_images), dtype=np.int16)
+        self._heights = np.zeros((self.num_images), dtype=np.int16)
+        return [self._load_json_annotation(i) for i in range(self.num_images)]
 
 
 """
