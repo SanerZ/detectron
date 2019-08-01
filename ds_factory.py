@@ -359,7 +359,7 @@ class fddb_gt(imdb):
                          'cls':   cls,
                          'diff':  diff, #np.zeros(len(cls))
                        }
-            if angle_cls：
+            if angle_cls:
                 frontal = gt[:, 5]==1
                 gt_label.update({'frontal':frontal})
             gt_roidb.append(gt_label)

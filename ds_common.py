@@ -16,6 +16,8 @@ import os
 from xml.dom.minidom import Document
 from easydict import EasyDict as edict
 from functools import partial
+from collections import defaultdict
+import json
 
 from .bbs_utils import overlay_bounding_boxes, xyxy_to_xywh, xywh_to_xyxy, bb_filter
 
@@ -541,3 +543,42 @@ class imdb(object):
         line = header + img_size + boxes
         f.write('\t'.join(line))
         # f.write('\n')
+
+    # coco format
+    def write_coco_format(self, fname):
+        dts = defaultdict(list)
+        dts['info'] = {'name': self.name}
+        # categoreis
+        for i, cls in enumerate(self.cfg.labels):
+            if i == 0 and cls == 'background':
+                continue
+            dts['categories'].append({'id': i, 'name': cls, 'supercategory': 'mark'})
+        # images && annotations
+        n_bbx = 0
+        for i in range(self.num_images):
+            dts['images'].append({'file_name': self.image_path_at(i),
+                                  'id': i,
+                                  'width': self.widths[i],
+                                  'height': self.heights[i]
+                                  })
+            gt_roidb = self.gt_roidb[i]
+            boxes = xywh_to_xyxy(gt_roidb['boxes'], self.cfg.data_format == 'LTWH')
+            cls_ids = [self.cfg.labels.index(c) for c in gt_roidb['cls']]
+
+            for j in range(len(boxes)):
+                x1, y1, x2, y2 = boxes[j]
+                w = max(0, x2 - x1)
+                h = max(0, y2 - y1)
+                dts['annotations'].append({
+                    'area': w * h,
+                    'bbox': [x1, y1, w, h],
+                    'category_id': cls_ids[j],
+                    'id': n_bbx,
+                    'image_id': i,
+                    'iscrowd': 0,
+                    'segmentation': [[x1, y1, x2, y1, x2, y2, x1, y2]]
+                })
+                n_bbx += 1
+        dataset = dts
+        with open(fname, 'w') as f:
+            json.dump(dataset, f)
