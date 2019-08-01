@@ -119,7 +119,7 @@ def evalRes(gt, det, ovthresh=0.5, multi_match=False):
                 
     return gt_o, det_o
 
-def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
+def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[], ref_err=0.1**np.arange(4, 0, -1)):
     """
     gt: groudtruth          x, y, w, h, difficult, match
     det: detection result   x, y, w, h, confidence, match(ovlap), [id]
@@ -165,13 +165,11 @@ def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
     ids, score = det_valid[:,-1], det_valid[:,4]
     
     if ref_score == []:
-        ref_thr, ref_idx = ref_threshold(ids, score, fp0, nImg, custom)
+        ref_thr, ref_idx = ref_threshold(ids, score, fp0, tp, nImg, custom, ref_err)
         rec_hat = np.append(rec, 0)
         recpi = rec_hat[ref_idx]
         iou_hat = np.append(iou_rec, 0)
-        # iou_metric = rec_hat[ref_idx]
         iou_metric = iou_hat[ref_idx]
-        # iou_metric_min = [min(iou[:idx+1]) for idx in ref_idx] 
     else:
         ref_thr = ref_score
         recpi = np.zeros(len(ref_thr))
@@ -187,14 +185,16 @@ def compRoc(gt, det, custom=True, use_11_points=False, ref_score=[]):
 
 """ Helper Functioins """
 
-def ref_threshold(ids, score, fp, nImg, custom=True, ref=0.1**np.arange(4,0,-1)):
+def ref_threshold(ids, score, fp, tp, nImg, custom=True, ref=0.1**np.arange(4,0,-1)):
     # compute number of error images
     if custom:
         fp_im = [fp[i] and im_id not in ids[:i][fp[:i]] for i,im_id in enumerate(ids)]
         fp_im = np.cumsum(fp_im).astype(float)
         err = fp_im/nImg
     else:
-        err = np.cumsum(fp).astype(float)/len(fp)
+        fp = np.cumsum(fp)
+        err = fp * 1.0 / np.maximum(tp + fp, np.finfo(np.float64).eps)
+
 
     ref_idx = np.zeros(len(ref), dtype=int)
     for i, rf in enumerate(ref):
