@@ -520,21 +520,25 @@ class imdb(object):
 
     # rec_file for gluon
     def write_rec_file(self, fname):
+        self.valid_image_index = []
         with open(fname, 'w') as f:
             for i in range(self.num_images):
-                self._write_rec_line(i, f)
-                if i < self.num_images-1:
+                if self._write_rec_line(i, f) and i < self.num_images-1:
                     f.write('\n')
+        self._image_index = self.valid_image_index
 
     def _write_rec_line(self, idx, f):
-        header = [str(idx), '4', '9']
+        header = ['4', '9']
         img_size = [str(self.widths[idx]), str(self.heights[idx])]
-        boxes = self.gt_boxes[idx][:,:4]
+        boxes = self.gt_boxes[idx][:, :4] # must be LTWH???
         nboxes = boxes.shape[0]
-        if self.cfg.data_format == 'LTWH':
-            boxes = xywh_to_xyxy(boxes)
-        WH = np.tile(img_size, reps=(1,2)).astype(int)
-        boxes = np.round(boxes / WH, decimals=3).astype(str)
+        if nboxes == 0:
+            return False
+
+        self.valid_image_index.append(self.image_index[idx])
+        boxes = xywh_to_xyxy(boxes)
+        WH = np.tile(img_size, reps=(1, 2)).astype(int)
+        boxes = np.round(boxes / WH, decimals=4).astype(str)
         attr = (-np.ones((nboxes, 4))).astype(int).astype(str)
         boxes = np.column_stack((boxes, attr))
         boxes = np.column_stack((['0']* nboxes, boxes))
@@ -542,7 +546,8 @@ class imdb(object):
 
         line = header + img_size + boxes
         f.write('\t'.join(line))
-        # f.write('\n')
+
+        return True
 
     # coco format
     def write_coco_format(self, fname):
