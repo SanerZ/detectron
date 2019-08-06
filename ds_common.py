@@ -519,16 +519,18 @@ class imdb(object):
                     format(xmin, ymin, xmax, ymax, diff[i])))
 
     # rec_file for gluon
-    def write_rec_file(self, fname):
+    def write_rec_file(self, fname, num_attr=5):
+        self._rec_header = ['4', '%s' % (5+num_attr)]
         self.valid_image_index = []
         with open(fname, 'w') as f:
             for i in range(self.num_images):
                 if self._write_rec_line(i, f) and i < self.num_images-1:
                     f.write('\n')
         self._image_index = self.valid_image_index
+        self._num_attr = num_attr
 
     def _write_rec_line(self, idx, f):
-        header = ['4', '9']
+        # header = ['4', '9']
         img_size = [str(self.widths[idx]), str(self.heights[idx])]
         boxes = self.gt_boxes[idx][:, :4] # must be LTWH???
         nboxes = boxes.shape[0]
@@ -539,12 +541,13 @@ class imdb(object):
         boxes = xywh_to_xyxy(boxes)
         WH = np.tile(img_size, reps=(1, 2)).astype(int)
         boxes = np.round(boxes / WH, decimals=4).astype(str)
-        attr = (-np.ones((nboxes, 4))).astype(int).astype(str)
+        attr = self.gt_roidb[idx]['attr'].astype(str)
+        # attr = (-np.ones((nboxes, 4))).astype(int).astype(str)
         boxes = np.column_stack((boxes, attr))
         boxes = np.column_stack((['0']* nboxes, boxes))
         boxes = boxes.flatten().tolist()
 
-        line = header + img_size + boxes
+        line = self._rec_header + img_size + boxes
         f.write('\t'.join(line))
 
         return True

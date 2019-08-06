@@ -302,7 +302,8 @@ class fcn_lmk(imdb):
 """
                 FDDB_GT DATASET
 """    
-    
+
+
 class fddb_gt(imdb):
     def __init__(self, name, data_path, gt_lst, **ds_params):
         imdb.__init__(self, name, data_path)
@@ -323,13 +324,13 @@ class fddb_gt(imdb):
                 
         self._image_index, self._gt_roidb = self._load_fddb_gt()
 
-                    
     def _load_fddb_gt(self):
         assert osp.exists(self._gt_lst), \
                 'Path does not exist: {}'.format(self._gt_lst)
 
-        angle_cls = eval(self.cfg.get('angle_cls', 'False'))       
-        image_set = self.cfg.get('image_set','')
+        angle_cls = eval(self.cfg.get('angle_cls', 'False'))
+        attr_label = eval(self.cfg.get('attr_label', 'None'))
+        image_set = self.cfg.get('image_set', '')
         if image_set:
             self._image_index = self._load_image_set_index()
         
@@ -361,7 +362,11 @@ class fddb_gt(imdb):
                        }
             if angle_cls:
                 frontal = gt[:, 5]==1
-                gt_label.update({'frontal':frontal})
+                gt_label.update({'frontal': frontal})
+            if attr_label:
+                gt_label.update(
+                    {'attr': gt[:, attr_label].astype(int)}
+                )
             gt_roidb.append(gt_label)
         
         return img_index, gt_roidb
