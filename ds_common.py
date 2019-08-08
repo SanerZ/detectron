@@ -268,7 +268,6 @@ class imdb(object):
         
         return fig, [xlim, ylim]
 
-   
     def density_dist(self, **filter_params):
         """Distribution of groundtruth number per image """
         self.gt_filter(**filter_params)
@@ -282,7 +281,6 @@ class imdb(object):
         
         return valid_image_index.tolist()
 
-        
     def scale_dist(self, pix=False, **filter_params):
         """Distribution of groundtruth scale"""
         self.gt_filter(**filter_params)
@@ -302,6 +300,16 @@ class imdb(object):
        
         scale, hist = self._draw_dist(gt_scale)
 
+    def attr_dist(self):
+        """Distribution of multiple attributes"""
+        attrs = []
+        for i in range(self.num_images):
+            attr = self.gt_roidb[i]['attr']
+            attrs.append(attr)
+        attrs = np.concatenate(attrs, 0)
+
+        for a in range(attrs.shape[1]):
+            _, _ = self._draw_dist(attrs[:, a])
 
 
     # TODO: 
