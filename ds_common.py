@@ -254,12 +254,15 @@ class imdb(object):
             # return boxes[~ign, :4]
         
         # self._gt_boxes_filter = map(bb_filter, self.gt_boxes)
-        
-    
-    def _draw_dist(self, data):
+
+    def _draw_dist(self, data, keep_ignore=True):
         """Draw distribution figure of data array"""
         
         xlim, ylim = np.unique(data, return_counts=True)
+
+        if not keep_ignore:
+            xlim = xlim[1:]
+            ylim = ylim[1:]
             
         fig = plt.figure()            
         plt.bar(xlim, ylim, linewidth=0.2)
@@ -300,7 +303,7 @@ class imdb(object):
        
         scale, hist = self._draw_dist(gt_scale)
 
-    def attr_dist(self):
+    def attr_dist(self, keep_ignore=False):
         """Distribution of multiple attributes"""
         attrs = []
         for i in range(self.num_images):
@@ -309,7 +312,7 @@ class imdb(object):
         attrs = np.concatenate(attrs, 0)
 
         for a in range(attrs.shape[1]):
-            _, _ = self._draw_dist(attrs[:, a])
+            _, _ = self._draw_dist(attrs[:, a], keep_ignore)
 
 
     # TODO: 
